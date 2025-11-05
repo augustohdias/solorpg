@@ -1,0 +1,12 @@
+{
+  "oracleName": "Endure Stress",
+  "oracleDescription": "Tabela de consequências quando spirit = 0 em Endure Stress Miss",  
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 10], "entryText": "Você está permanentemente abalado.", "entryConsequence": "move:Face Desolation"},
+    {"entryRange": [11, 25], "entryText": "Você está em desespero. -1 momentum contínuo até descansar.", "entryConsequence": "resource:momentum:-1"},
+    {"entryRange": [26, 50], "entryText": "Você está perturbado e não pode se concentrar.", "entryConsequence": null},
+    {"entryRange": [51, 100], "entryText": "Você está estressado mas consegue continuar.", "entryConsequence": null}
+  ]
+}
+

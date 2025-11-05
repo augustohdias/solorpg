@@ -1,0 +1,77 @@
+{
+  "oracleName": "Região",
+  "oracleDescription": "Oráculo para determinar aleatoriamente a macrorregião geográfica da aventura nas Terras de Ferro (Oráculo 4).",
+  "oracleDice": "1d100",
+  "oracleEntries":[
+    {
+      "entryRange": [
+        1,
+        12
+      ],
+      "entryText": "A Costa Esfarrapada"
+    },
+    {
+      "entryRange": [
+        13,
+        24
+      ],
+      "entryText": "As Selvas Profundas"
+    },
+    {
+      "entryRange": [
+        25,
+        36
+      ],
+      "entryText": "As Terras Inundadas"
+    },
+    {
+      "entryRange": [
+        37,
+        48
+      ],
+      "entryText": "Os Refúgios"
+    },
+    {
+      "entryRange": [
+        49,
+        60
+      ],
+      "entryText": "O Núcleo"
+    },
+    {
+      "entryRange": [
+        61,
+        68
+      ],
+      "entryText": "As Montanhas Veladas"
+    },
+    {
+      "entryRange": [
+        69,
+        76
+      ],
+      "entryText": "As Colinas da Tempestade"
+    },
+    {
+      "entryRange": [
+        77,
+        84
+      ],
+      "entryText": "Os Ermos Estilhaçados"
+    },
+    {
+      "entryRange": [
+        85,
+        92
+      ],
+      "entryText": "As Charnecas Altas"
+    },
+    {
+      "entryRange": [
+        93,
+        100
+      ],
+      "entryText": "Outros Lugares"
+    }
+  ]
+}

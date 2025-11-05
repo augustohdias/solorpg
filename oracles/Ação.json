@@ -1,0 +1,182 @@
+{
+    "oracleName": "Ação",
+    "oracleDescription": "O verbo (movimento dinâmico) para gerar um prompt narrativo (Oráculo 1).",
+    "oracleDice": "1d100",
+    "oracleEntries": [
+        {
+            "entryRange": [
+                1,
+                4
+            ],
+            "entryText": "Esquema"
+        },
+        {
+            "entryRange": [
+                5,
+                8
+            ],
+            "entryText": "Confronto"
+        },
+        {
+            "entryRange": [
+                9,
+                12
+            ],
+            "entryText": "Fraqueza"
+        },
+        {
+            "entryRange": [
+                13,
+                16
+            ],
+            "entryText": "Iniciar"
+        },
+        {
+            "entryRange": [
+                17,
+                20
+            ],
+            "entryText": "Criar"
+        },
+        {
+            "entryRange": [
+                21,
+                24
+            ],
+            "entryText": "Jurar"
+        },
+        {
+            "entryRange": [
+                25,
+                28
+            ],
+            "entryText": "Vingar"
+        },
+        {
+            "entryRange": [
+                29,
+                32
+            ],
+            "entryText": "Guardar"
+        },
+        {
+            "entryRange": [
+                33,
+                36
+            ],
+            "entryText": "Derrotar"
+        },
+        {
+            "entryRange": [
+                37,
+                40
+            ],
+            "entryText": "Controlar"
+        },
+        {
+            "entryRange": [
+                41,
+                44
+            ],
+            "entryText": "Quebrar"
+        },
+        {
+            "entryRange": [
+                45,
+                48
+            ],
+            "entryText": "Arriscar"
+        },
+        {
+            "entryRange": [
+                49,
+                52
+            ],
+            "entryText": "Render-se"
+        },
+        {
+            "entryRange": [
+                53,
+                56
+            ],
+            "entryText": "Inspecionar"
+        },
+        {
+            "entryRange": [
+                57,
+                60
+            ],
+            "entryText": "Atacar (Incursão)"
+        },
+        {
+            "entryRange": [
+                61,
+                64
+            ],
+            "entryText": "Evadir"
+        },
+        {
+            "entryRange": [
+                65,
+                68
+            ],
+            "entryText": "Assaltar"
+        },
+        {
+            "entryRange": [
+                69,
+                72
+            ],
+            "entryText": "Desviar"
+        },
+        {
+            "entryRange": [
+                73,
+                76
+            ],
+            "entryText": "Ameaçar"
+        },
+        {
+            "entryRange": [
+                77,
+                80
+            ],
+            "entryText": "Atacar"
+        },
+        {
+            "entryRange": [
+                81,
+                84
+            ],
+            "entryText": "Faltar"
+        },
+        {
+            "entryRange": [
+                85,
+                88
+            ],
+            "entryText": "Suprimir"
+        },
+        {
+            "entryRange": [
+                89,
+                92
+            ],
+            "entryText": "Caçar"
+        },
+        {
+            "entryRange": [
+                93,
+                96
+            ],
+            "entryText": "Compartilhar"
+        },
+        {
+            "entryRange": [
+                97,
+                100
+            ],
+            "entryText": "Destruir"
+        }
+    ]
+}

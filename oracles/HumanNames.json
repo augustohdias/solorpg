@@ -1,0 +1,19 @@
+{
+  "oracleName": "Nomes Humanos",
+  "oracleDescription": "Nomes comuns nas Ironlands",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 10], "entryText": "Aldric"},
+    {"entryRange": [11, 20], "entryText": "Beowulf"},
+    {"entryRange": [21, 30], "entryText": "Corin"},
+    {"entryRange": [31, 40], "entryText": "Dagmar"},
+    {"entryRange": [41, 50], "entryText": "Eivor"},
+    {"entryRange": [51, 60], "entryText": "Freya"},
+    {"entryRange": [61, 70], "entryText": "Gunnar"},
+    {"entryRange": [71, 80], "entryText": "Helga"},
+    {"entryRange": [81, 90], "entryText": "Ingrid"},
+    {"entryRange": [91, 100], "entryText": "Ragnar"}
+  ]
+}
+
+

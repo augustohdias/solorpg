@@ -1,0 +1,14 @@
+cradle:
+  stack:
+    - path: "./src"
+      component: "SoloRPG:lib"
+
+    - path: "./app"
+      component: "SoloRPG:exe:SoloRPG-exe"
+
+    - path: "./test"
+      component: "SoloRPG:test:SoloRPG-test"
+
+    - path: "./"
+      component: "SoloRPG:lib"
+

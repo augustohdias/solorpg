@@ -1,0 +1,182 @@
+{
+    "oracleName": "Tema",
+    "oracleDescription": "O substantivo (foco conceitual) para gerar um prompt narrativo (Oráculo 2).",
+    "oracleDice": "1d100",
+    "oracleEntries": [
+        {
+            "entryRange": [
+                1,
+                4
+            ],
+            "entryText": "Risco"
+        },
+        {
+            "entryRange": [
+                5,
+                8
+            ],
+            "entryText": "Habilidade"
+        },
+        {
+            "entryRange": [
+                9,
+                12
+            ],
+            "entryText": "Criação"
+        },
+        {
+            "entryRange": [
+                13,
+                16
+            ],
+            "entryText": "Aliança"
+        },
+        {
+            "entryRange": [
+                17,
+                20
+            ],
+            "entryText": "Adversidade"
+        },
+        {
+            "entryRange": [
+                21,
+                24
+            ],
+            "entryText": "Barreira"
+        },
+        {
+            "entryRange": [
+                25,
+                28
+            ],
+            "entryText": "Liderança"
+        },
+        {
+            "entryRange": [
+                29,
+                32
+            ],
+            "entryText": "Comunidade"
+        },
+        {
+            "entryRange": [
+                33,
+                36
+            ],
+            "entryText": "História"
+        },
+        {
+            "entryRange": [
+                37,
+                40
+            ],
+            "entryText": "Mundo"
+        },
+        {
+            "entryRange": [
+                41,
+                44
+            ],
+            "entryText": "Voto"
+        },
+        {
+            "entryRange": [
+                45,
+                48
+            ],
+            "entryText": "Inimigo"
+        },
+        {
+            "entryRange": [
+                49,
+                52
+            ],
+            "entryText": "Natureza"
+        },
+        {
+            "entryRange": [
+                53,
+                56
+            ],
+            "entryText": "Segredo"
+        },
+        {
+            "entryRange": [
+                57,
+                60
+            ],
+            "entryText": "Mística"
+        },
+        {
+            "entryRange": [
+                61,
+                64
+            ],
+            "entryText": "Sonho"
+        },
+        {
+            "entryRange": [
+                65,
+                68
+            ],
+            "entryText": "Fama"
+        },
+        {
+            "entryRange": [
+                69,
+                72
+            ],
+            "entryText": "Destino"
+        },
+        {
+            "entryRange": [
+                73,
+                76
+            ],
+            "entryText": "Prêmio"
+        },
+        {
+            "entryRange": [
+                77,
+                80
+            ],
+            "entryText": "Território"
+        },
+        {
+            "entryRange": [
+                81,
+                84
+            ],
+            "entryText": "Poder"
+        },
+        {
+            "entryRange": [
+                85,
+                88
+            ],
+            "entryText": "Honra"
+        },
+        {
+            "entryRange": [
+                89,
+                92
+            ],
+            "entryText": "Justiça"
+        },
+        {
+            "entryRange": [
+                93,
+                96
+            ],
+            "entryText": "Verdade"
+        },
+        {
+            "entryRange": [
+                97,
+                100
+            ],
+            "entryText": "Perigo"
+        }
+    ]
+}
