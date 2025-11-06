@@ -1,7 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
-module System.Impl.ActionService (newHandle, isPayThePriceTrigger) where
+{-# LANGUAGE NamedFieldPuns #-}
+module System.Impl.ActionService (newHandle) where
 
 import qualified System.ActionContract as Action
+import System.ActionContract (ActionContext(..))
 import qualified System.DiceContract as Dice
 import qualified System.GameContextContract as GameContext
 import qualified System.MoveContract as Move
@@ -13,741 +15,278 @@ import qualified Data.Text as T
 import qualified Data.Text.Read as TR
 import System.Tui.Comm (GameOutput(..), MessageType(..))
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
-import Data.Maybe (fromMaybe, listToMaybe)
-import Control.Monad (unless, void)
+import Control.Monad (void)
 import Data.Foldable (for_)
 
 newHandle :: Dice.Handle -> GameContext.Handle -> Move.Handle -> Progress.Handle -> Oracle.Handle -> Help.Handle -> TChan GameOutput -> IO Action.Handle
-newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler helpHandler outputChan =
-  return $
-    Action.Handle
-      { Action.process = processAction
-      }
+newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler helpHandler tuiOutputChannel = do
+  return actionHandle
   where
-    processAction actionType = case actionType of
-      Action.AddStoryLog -> addStoryLog
-      Action.RollDice -> rollDice
-      Action.Show -> showLogs
-      Action.Exit -> exit
-      Action.CreateCharacter -> createCharacter
-      Action.LoadCharacter -> loadCharacter
-      Action.ShowCharacter -> showCharacter
-      Action.UpdateAttribute -> updateAttribute
-      Action.UpdateResource -> updateResource
-      Action.AddAttribute -> addAttribute
-      Action.AddResource -> addResource
-      Action.Challenge -> challenge
-      Action.Move -> moveAction
-      Action.SwearVow -> swearVow
-      Action.MarkProgress -> markProgress
-      Action.RollProgress -> rollProgress
-      Action.ShowTracks -> showTracks
-      Action.AbandonTrack -> abandonTrack
-      Action.Oracle -> oracleQuery
-      Action.Help -> helpCommand
-      Action.Bond -> bondCommand
-      _ -> defaultAction
+    actionContext = ActionContext {
+      diceHandler = diceHandler,
+      contextHandler = contextHandler,
+      moveHandler = moveHandler,
+      progressHandler = progressHandler,
+      oracleHandler = oracleHandler,
+      helpHandler = helpHandler,
+      tuiOutputChannel = tuiOutputChannel
+    }
+    actionHandle = Action.Handle { Action.process = processAction actionContext }
+    processAction aCtx actionType = case actionType of
+      Action.AddStoryLog -> addStoryLog aCtx
+      Action.RollDice -> rollDice aCtx actionHandle
+      Action.Show -> showLogs aCtx
+      Action.Exit -> exit aCtx
+      Action.CreateCharacter -> createCharacter aCtx
+      Action.LoadCharacter -> loadCharacter aCtx
+      Action.ShowCharacter -> showCharacter aCtx
+      Action.UpdateAttribute -> updateAttribute aCtx
+      Action.UpdateResource -> updateResource aCtx
+      Action.AddAttribute -> addAttribute aCtx
+      Action.AddResource -> addResource aCtx
+      Action.Challenge -> challenge aCtx
+      Action.Move -> moveAction aCtx
+      Action.SwearVow -> swearVow aCtx
+      Action.MarkProgress -> markProgress aCtx
+      Action.RollProgress -> rollProgress aCtx
+      Action.ShowTracks -> showTracks aCtx
+      Action.AbandonTrack -> abandonTrack aCtx
+      Action.Oracle -> oracleQuery aCtx
+      Action.Help -> helpCommand aCtx
+      Action.Bond -> bondCommand aCtx
+      _ -> defaultAction aCtx
 
-    defaultAction _ = return False
+-- | Helper for sending narrative/game log messages to the TUI
+logMessage :: ActionContext -> T.Text -> IO ()
+logMessage ActionContext { tuiOutputChannel } msg = 
+  atomically $ writeTChan tuiOutputChannel (LogEntry msg NarrativeMessage)
 
-    -- | Helper for sending narrative/game log messages to the TUI
-    logMessage :: T.Text -> IO ()
-    logMessage msg = atomically $ writeTChan outputChan (LogEntry msg NarrativeMessage)
+-- | Helper for sending system notifications to the TUI
+systemMessage :: ActionContext -> T.Text -> IO ()
+systemMessage ActionContext { tuiOutputChannel } msg = 
+  atomically $ writeTChan tuiOutputChannel (LogEntry msg SystemMessage)
 
-    -- | Helper for sending system notifications to the TUI
-    systemMessage :: T.Text -> IO ()
-    systemMessage msg = atomically $ writeTChan outputChan (LogEntry msg SystemMessage)
+-- | Executa uma ação que requer um contexto de personagem carregado.
+-- Mostra uma mensagem de erro se nenhum personagem estiver carregado.
+withContext :: ActionContext -> (GameContext.Context -> IO Bool) -> IO Bool
+withContext aCtx@ActionContext { contextHandler } action = do
+  maybeCtx <- GameContext.getCurrentContext contextHandler
+  case maybeCtx of
+    Nothing -> do
+      systemMessage aCtx (C.msgNoCharacterLoaded C.messages)
+      return True
+    Just ctx -> action ctx
 
-    -- | Executa uma ação que requer um contexto de personagem carregado.
-    -- Mostra uma mensagem de erro se nenhum personagem estiver carregado.
-    withContext :: (GameContext.Context -> IO Bool) -> IO Bool
-    withContext action = do
-      maybeCtx <- GameContext.getCurrentContext contextHandler
-      case maybeCtx of
-        Nothing -> do
-          systemMessage (C.msgNoCharacterLoaded C.messages)
-          return True
-        Just ctx -> action ctx
+-- | Executa uma ação em um contexto, se ele existir, mas não faz nada
+-- (e não mostra erro) se o contexto for Nothing.
+whenContext :: ActionContext -> (GameContext.Context -> IO ()) -> IO ()
+whenContext ActionContext { contextHandler } action = do
+  maybeCtx <- GameContext.getCurrentContext contextHandler
+  for_ maybeCtx action
 
-    -- | Executa uma ação em um contexto, se ele existir, mas não faz nada
-    -- (e não mostra erro) se o contexto for Nothing.
-    whenContext :: (GameContext.Context -> IO ()) -> IO ()
-    whenContext action = do
-      maybeCtx <- GameContext.getCurrentContext contextHandler
-      for_ maybeCtx action
+-- | Default action for unknown action types
+defaultAction :: ActionContext -> T.Text -> IO Bool
+defaultAction _ _ = return False
 
-    addStoryLog story = do
-      -- Ignora entradas que começam com : (são comandos, não narrativa)
-      if T.isPrefixOf ":" story
-        then return True
-        else do
-          whenContext $ \ctx -> do
-            ctxWithLog <- GameContext.addLogEntry contextHandler ctx story
-            void $ GameContext.saveContext contextHandler ctxWithLog
-          -- Always send story log to TUI
-          logMessage story
-          return True
-
-    rollDice diceDescription = do
-      rolls <- Dice.roll diceHandler diceDescription
-      let msg = C.msgDiceRolled C.messages <> T.pack (show rolls)
-      logMessage msg
-
-      -- Se há contexto, adiciona ao log do personagem
-      whenContext $ \ctx -> do
-        ctxWithLog <- GameContext.addLogEntry contextHandler ctx msg
-        void $ GameContext.saveContext contextHandler ctxWithLog
+-- | Adiciona entrada narrativa ao log
+addStoryLog :: ActionContext -> T.Text -> IO Bool
+addStoryLog aCtx story = do
+  -- Ignora entradas que começam com : (são comandos, não narrativa)
+  if T.isPrefixOf ":" story
+    then return True
+    else do
+      whenContext aCtx $ \ctx -> do
+        ctxWithLog <- GameContext.addLogEntry (contextHandler aCtx) ctx story
+        void $ GameContext.saveContext (contextHandler aCtx) ctxWithLog
+      logMessage aCtx story
       return True
 
-    showLogs _ = withContext $ \ctx -> do
-      logMessage (C.msgLogsHeader C.messages)
-      let logs = GameContext.getSessionLog contextHandler ctx
-      mapM_ logMessage logs
+-- | Rola dados usando a string de especificação
+rollDice :: ActionContext -> Action.Handle -> T.Text -> IO Bool
+rollDice aCtx@ActionContext { diceHandler } actionH diceDescription = do
+  rolls <- Dice.roll diceHandler diceDescription
+  let msg = C.msgDiceRolled C.messages <> T.pack (show rolls)
+  -- Delega a adição do log para o handle de ação
+  _ <- Action.process actionH Action.AddStoryLog msg
+  logMessage aCtx "As tramas do destino foram lançadas..."
+  return True
+
+-- | Mostra logs da sessão
+showLogs :: ActionContext -> T.Text -> IO Bool
+showLogs aCtx _ = withContext aCtx $ \ctx -> do
+  logMessage aCtx (C.msgLogsHeader C.messages)
+  let logs = GameContext.getSessionLog (contextHandler aCtx) ctx
+  mapM_ (logMessage aCtx) logs
+  return True
+
+-- | Encerra a sessão
+exit :: ActionContext -> T.Text -> IO Bool
+exit aCtx@ActionContext { tuiOutputChannel } _ = do
+  systemMessage aCtx (C.msgSessionEnded C.messages)
+  atomically $ writeTChan tuiOutputChannel GameEnd
+  return False
+
+-- | Cria novo personagem
+createCharacter :: ActionContext -> T.Text -> IO Bool
+createCharacter aCtx@ActionContext { contextHandler, tuiOutputChannel } input = do
+  -- Input esperado: "NomePersonagem iron:3 edge:2 heart:2 shadow:1 wits:2"
+  let parts = T.words input
+  if null parts
+    then do
+      systemMessage aCtx (C.msgCharacterNameRequired C.messages)
       return True
+    else do
+      let charName = head parts
+      let attrParts = tail parts
 
-    exit _ = do
-      systemMessage (C.msgSessionEnded C.messages)
-      atomically $ writeTChan outputChan GameEnd
-      return False
+      -- Parse dos atributos (valores padrão se não fornecidos)
+      let attrs = parseAttributes attrParts
 
-    -- Funções para gerenciamento de contexto
-    createCharacter input = do
-      -- Input esperado: "NomePersonagem iron:3 edge:2 heart:2 shadow:1 wits:2"
-      let parts = T.words input
-      if null parts
-        then do
-          systemMessage (C.msgCharacterNameRequired C.messages)
-          return True
-        else do
-          let charName = head parts
-          let attrParts = tail parts
-
-          -- Parse dos atributos (valores padrão se não fornecidos)
-          let attrs = parseAttributes attrParts
-
-          result <- GameContext.createContext contextHandler charName attrs
-          case result of
-            Left err -> do
-              systemMessage (C.msgErrorCreating C.messages <> T.pack (show err))
-              return True
-            Right ctx -> do
-              let msg = C.msgCharacterCreated C.messages <> GameContext.getCharacterName ctx
-              systemMessage msg
-
-              -- Não adiciona ao log (apenas mensagem de sistema)
-              _ <- GameContext.saveContext contextHandler ctx
-              atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter ctx))
-              return True
-
-    loadCharacter charName = do
-      if T.null charName
-        then do
-          systemMessage (C.msgCharacterNameRequired C.messages)
-          return True
-        else do
-          result <- GameContext.loadContext contextHandler charName
-          case result of
-            Left err -> do
-              systemMessage (C.msgErrorLoading C.messages <> T.pack (show err))
-              return True
-            Right ctx -> do
-              let msg = C.msgCharacterLoaded C.messages <> GameContext.getCharacterName ctx
-              systemMessage msg
-
-              -- Load and display session logs (reverse order - newest first)
-              let sessionLogs = reverse $ GameContext.getSessionLog contextHandler ctx
-              mapM_ logMessage sessionLogs
-
-              -- Não adiciona ao log (apenas mensagem de sistema)
-              _ <- GameContext.saveContext contextHandler ctx
-              atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter ctx))
-              return True
-
-    showCharacter _ = withContext $ \ctx -> do
-      let char = GameContext.mainCharacter ctx
-      atomically $ writeTChan outputChan (CharacterUpdate char)
-      -- Don't log message to avoid spam from periodic updates
-      return True
-
-    updateAttribute input = withContext $ \ctx -> do
-      let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
-      case parseAttributeUpdate input oldAttrs of
-        Nothing -> do
-          systemMessage (C.msgInvalidAttributeFormat C.messages)
-          return True
-        Just newAttrs -> do
-          updatedCtx <- GameContext.updateAttributes contextHandler ctx newAttrs
-          _ <- GameContext.saveContext contextHandler updatedCtx
-          systemMessage (C.msgAttributeUpdated C.messages)
-          atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter updatedCtx))
-          return True
-
-    updateResource input = withContext $ \ctx -> do
-      let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
-      case parseResourceUpdate input oldRes of
-        Nothing -> do
-          systemMessage (C.msgInvalidResourceFormat C.messages)
-          return True
-        Just newRes -> do
-          updatedCtx <- GameContext.updateResources contextHandler ctx newRes
-          _ <- GameContext.saveContext contextHandler updatedCtx
-          systemMessage (C.msgResourceUpdated C.messages)
-          atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter updatedCtx))
-          return True
-
-    addAttribute input = withContext $ \ctx -> do
-      let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
-      case parseAttributeAdd input oldAttrs of
-        Nothing -> do
-          systemMessage "Formato inválido. Use: atributo:delta (ex: iron:-1, edge:+2)"
-          return True
-        Just newAttrs -> do
-          updatedCtx <- GameContext.updateAttributes contextHandler ctx newAttrs
-          _ <- GameContext.saveContext contextHandler updatedCtx
-          systemMessage (C.msgAttributeUpdated C.messages)
-          atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter updatedCtx))
-          return True
-
-    addResource input = withContext $ \ctx -> do
-      let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
-      case parseResourceAdd input oldRes of
-        Nothing -> do
-          systemMessage "Formato inválido. Use: recurso:delta (ex: health:-1, momentum:+2)"
-          return True
-        Just newRes -> do
-          updatedCtx <- GameContext.updateResources contextHandler ctx newRes
-          _ <- GameContext.saveContext contextHandler updatedCtx
-          systemMessage (C.msgResourceUpdated C.messages)
-          atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter updatedCtx))
-          return True
-
-    challenge _ = do
-      -- Rola 1d6,2d10 automaticamente e avalia
-      rolls <- Dice.roll diceHandler "1d6,2d10"
-      case rolls of
-        [(_, actionDie), (_, ch1), (_, ch2)] -> do
-          let result = evaluateActionRoll actionDie ch1 ch2
-          let resultMsg = showActionRollResult result
-          let interpretation = case result of
-                Dice.StrongHit -> C.challengeStrongHit C.challengeInterpretation
-                Dice.WeakHit -> C.challengeWeakHit C.challengeInterpretation
-                Dice.Miss -> C.challengeMiss C.challengeInterpretation
-                Dice.InvalidRoll -> ""
-          let matchMsg = if ch1 == ch2 then C.challengeMatch C.challengeInterpretation else ""
-
-          let formattedMsg = T.pack $ C.formatActionRoll C.characterDisplay actionDie ch1 ch2 resultMsg
-                          ++ interpretation ++ matchMsg
-          logMessage formattedMsg
-
-          return True
-        _ -> do
-          logMessage "Erro ao rolar dados para challenge"
-          return True
-
-    moveAction input = withContext $ \ctx -> do
-      let parts = T.words input
-      case parts of
-        [] -> do
-          systemMessage $ T.pack (C.msgMoveUsage C.helpMessages)
-          return True
-        (moveName:params) ->
-          case Move.parseMoveType moveHandler moveName of
-            Nothing -> do
-              systemMessage $ "Move desconhecido: " <> T.unwords parts <> "\n" <> T.pack (C.msgMovesAvailable C.helpMessages)
-              return True
-            Just moveType -> do
-              let (maybeStat, cleanParams) = parseMoveParams params
-              executeMoveByCategory moveType maybeStat cleanParams ctx
-
-    -- | Separa os parâmetros de um comando de move em stat (opcional) e o resto.
-    parseMoveParams :: [T.Text] -> (Maybe Move.Stat, T.Text)
-    parseMoveParams params =
-      case params of
-        (first:rest) ->
-          case Move.parseStat moveHandler first of
-            Just s  -> (Just s, T.unwords rest)
-            Nothing -> (Nothing, T.unwords params)
-        [] -> (Nothing, "")
-
-    -- | Direciona a execução do move baseado na sua categoria.
-    executeMoveByCategory :: Move.MoveType -> Maybe Move.Stat -> T.Text -> GameContext.Context -> IO Bool
-    executeMoveByCategory moveType maybeStat cleanParams ctx =
-      case moveType of
-        Move.SwearIronVow         -> executeMoveSwearVow cleanParams ctx
-        Move.FulfillYourVow       -> executeMoveFulfillVow cleanParams ctx
-        Move.UndertakeJourney     -> executeMoveUndertakeJourney maybeStat ctx
-        Move.ReachYourDestination -> executeMoveReachDestination cleanParams ctx
-        Move.EndTheFight          -> executeMoveEndFight cleanParams ctx
-        Move.ReachMilestone       -> executeMoveMilestone cleanParams ctx
-        Move.PayThePrice          -> executePayThePrice ctx
-        _                         -> executeStandardMove moveType maybeStat ctx
-
-    -- | Executa um move padrão (com rolagem de dados e consequências).
-    executeStandardMove :: Move.MoveType -> Maybe Move.Stat -> GameContext.Context -> IO Bool
-    executeStandardMove moveType maybeStat ctx = do
-      (moveResult, updatedCtx) <- Move.executeMove moveHandler moveType maybeStat ctx contextHandler
-
-      -- Log the move result to session
-      let moveName = Move.moveTypeToText moveType
-      let resultText = case Move.rollResult moveResult of
-            Dice.StrongHit -> "STRONG HIT"
-            Dice.WeakHit -> "WEAK HIT"
-            Dice.Miss -> "MISS"
-            Dice.InvalidRoll -> "INVALID ROLL"
-      let moveLog = ">>> " <> moveName <> " - " <> T.pack resultText
-      ctxWithLog <- GameContext.addLogEntry contextHandler updatedCtx moveLog
-
-      -- Salva o estado atualizado após o move
-      let updatedRes = GameContext.resources (GameContext.mainCharacter ctxWithLog)
-      ctxWithUpdatedRes <- GameContext.updateResources contextHandler ctxWithLog updatedRes
-      _ <- GameContext.saveContext contextHandler ctxWithUpdatedRes
-
-      -- Verifica se há moves triggered (PayThePrice, FaceDeath, etc)
-      let triggers = [m | Move.TriggerMove m <- Move.consequencesApplied moveResult]
-      case listToMaybe triggers of
-        Just triggeredMove -> executeTriggeredMove triggeredMove ctxWithUpdatedRes
-        Nothing -> return True
-
-    -- Funções auxiliares para progress moves via :move
-    executeMoveSwearVow input ctx = do
-      -- Parse: vow "Nome" rank ou apenas "Nome" rank (já parseado)
-      case parseQuotedString input of
-        Just (vowName, rest) -> do
-          let rankText = T.strip rest
-          case parseRank rankText of
-            Nothing -> do
-              systemMessage $ T.pack (C.msgVowUsage C.moveMessages)
-              return True
-            Just rank -> do
-              -- Cria track
-              let track = Progress.newProgressTrack vowName Progress.Vow rank
-              ctxWithTrack <- GameContext.addProgressTrack contextHandler ctx track
-
-              -- Executa o move (roll +heart)
-              (_, updatedCtx) <- Move.executeMove moveHandler Move.SwearIronVow (Just Move.Heart) ctxWithTrack contextHandler
-
-              let updatedRes = GameContext.resources (GameContext.mainCharacter updatedCtx)
-              ctxFinal <- GameContext.updateResources contextHandler updatedCtx updatedRes
-              _ <- GameContext.saveContext contextHandler ctxFinal
-
-              logMessage $ T.pack $ C.formatVowCreated C.moveMessages vowName (show rank) (Progress.getTicksForRank rank)
-              return True
-        Nothing -> do
-          systemMessage $ T.pack (C.msgVowUsage C.moveMessages)
-          return True
-
-    executeMoveFulfillVow input ctx = do
-      let trackName = case parseQuotedString input of
-            Just (name, _) -> name
-            Nothing -> T.strip input
-
-      case GameContext.getProgressTrack contextHandler ctx trackName of
-        Nothing -> do
-          systemMessage $ T.pack (C.errVowNotFound C.errorMessages) <> trackName
-          return True
-        Just track -> do
-          result <- Progress.rollProgress progressHandler track
-          interpretVowRoll logMessage result
-
-          -- Se strong ou weak hit, completa o track
-          case Progress.progressRollResult result of
-            Dice.StrongHit -> void $ completeTrackAndUpdateContext track
-            Dice.WeakHit   -> void $ completeTrackAndUpdateContext track
-            _                -> return ()
-
-          return True
-      where
-        completeTrackAndUpdateContext track = do
-          completed <- Progress.completeTrack progressHandler track
-          updatedCtx <- GameContext.updateProgressTrack contextHandler ctx (Progress.trackName track) completed
-          _ <- GameContext.saveContext contextHandler updatedCtx
-          return ()
-
-    executeMoveUndertakeJourney _maybeStat _ctx = do
-      logMessage $ T.pack (C.msgUndertakeJourney C.moveMessages)
-      return True
-
-    executeMoveReachDestination input ctx = do
-      let trackName = case parseQuotedString input of
-            Just (name, _) -> name
-            Nothing -> T.strip input
-
-      case GameContext.getProgressTrack contextHandler ctx trackName of
-        Nothing -> do
-          systemMessage $ C.msgTrackNotFound C.moveMessages <> trackName
-          return True
-        Just track -> do
-          result <- Progress.rollProgress progressHandler track
-          interpretJourneyRoll logMessage result
-          return True
-
-    executeMoveEndFight input ctx = do
-      let trackName = case parseQuotedString input of
-            Just (name, _) -> name
-            Nothing -> T.strip input
-
-      case GameContext.getProgressTrack contextHandler ctx trackName of
-        Nothing -> do
-          systemMessage $ C.msgTrackNotFound C.moveMessages <> trackName
-          return True
-        Just track -> do
-          result <- Progress.rollProgress progressHandler track
-          interpretCombatRoll logMessage result
-          return True
-
-    executePayThePrice ctx = do
-      -- Default to option 3: Roll on the Pay the Price table
-      logMessage "\n>>> Pay the Price <<<"
-      result <- Oracle.rollOracle oracleHandler "Pay the Price"
+      result <- GameContext.createContext contextHandler charName attrs
       case result of
         Left err -> do
-          logMessage $ "Erro ao consultar oráculo: " <> T.pack (show err)
+          systemMessage aCtx (C.msgErrorCreating C.messages <> T.pack (show err))
           return True
-        Right oracleResult -> do
-          logMessage $ "🔮 Pay the Price (Rolou " <> T.pack (show (Oracle.resultRoll oracleResult)) <> "):"
-          logMessage $ "→ " <> Oracle.resultText oracleResult
+        Right ctx -> do
+          let msg = C.msgCharacterCreated C.messages <> GameContext.getCharacterName ctx
+          systemMessage aCtx msg
 
-          -- Executa consequência se houver
-          executeOracleConsequence oracleResult
-
+          -- Não adiciona ao log (apenas mensagem de sistema)
           _ <- GameContext.saveContext contextHandler ctx
+          atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter ctx))
           return True
 
-    executeMoveMilestone input ctx = do
-      let trackName = parseTrackNameFromInput input
-
-      case GameContext.getProgressTrack contextHandler ctx trackName of
-        Nothing -> do
-          systemMessage $ T.pack (C.errVowNotFound C.errorMessages) <> trackName
-          return True
-        Just track -> do
-          updatedTrack <- Progress.markProgress progressHandler track
-          updatedCtx <- GameContext.updateProgressTrack contextHandler ctx trackName updatedTrack
-          _ <- GameContext.saveContext contextHandler updatedCtx
-          systemMessage (C.msgProgressMarked C.moveMessages)
-          return True
-
-    -- | Extrai o nome de um track do input do usuário (com ou sem aspas).
-    parseTrackNameFromInput :: T.Text -> T.Text
-    parseTrackNameFromInput input =
-      maybe (T.strip input) fst (parseQuotedString input)
-
-    -- Comandos de Progress Tracks
-    swearVow input = withContext $ \ctx -> do
-      -- Parse: :vow "Nome Do Voto" rank
-      case parseQuotedString input of
-        Just (vowName, rest) -> do
-          let rankText = T.strip rest
-          case parseRank rankText of
-            Nothing -> do
-              systemMessage $ T.pack (C.errInvalidRank C.errorMessages) <> rankText <> "\n" <> T.pack (C.msgRanksAvailable C.helpMessages)
-              return True
-            Just rank -> do
-              let track = Progress.newProgressTrack vowName Progress.Vow rank
-              updatedCtx <- GameContext.addProgressTrack contextHandler ctx track
-              _ <- GameContext.saveContext contextHandler updatedCtx
-
-              logMessage $ T.pack $ C.formatVowCreated C.moveMessages vowName (show rank) (Progress.getTicksForRank rank)
-              return True
-        Nothing -> do
-          systemMessage $ T.pack (C.msgVowUsage C.moveMessages)
-          return True
-
-    markProgress input = withContext $ \ctx -> do
-      let trackName = parseTrackNameFromInput input
-
-      case GameContext.getProgressTrack contextHandler ctx trackName of
-        Nothing -> do
-          systemMessage $ C.msgTrackNotFound C.moveMessages <> trackName <> "\n" <> T.pack (C.msgProgressUsage C.moveMessages)
-          return True
-        Just track -> do
-          updatedTrack <- Progress.markProgress progressHandler track
-          updatedCtx <- GameContext.updateProgressTrack contextHandler ctx trackName updatedTrack
-          _ <- GameContext.saveContext contextHandler updatedCtx
-          logMessage "Progress marked." -- Or some other confirmation
-          return True
-
-    rollProgress input = withContext $ \ctx -> do
-      let trackName = parseTrackNameFromInput input
-
-      case GameContext.getProgressTrack contextHandler ctx trackName of
-        Nothing -> do
-          systemMessage $ C.msgTrackNotFound C.moveMessages <> trackName
-          return True
-        Just track -> do
-          result <- Progress.rollProgress progressHandler track
-
-          -- Interpreta resultado baseado no tipo
-          case Progress.trackType track of
-            Progress.Vow     -> interpretVowRoll logMessage result
-            Progress.Combat  -> interpretCombatRoll logMessage result
-            Progress.Journey -> interpretJourneyRoll logMessage result
-
-          return True
-
-    showTracks _ = withContext $ \ctx -> do
-      let tracks = GameContext.progressTracks ctx
-      if null tracks
-        then logMessage $ T.pack (C.msgNoTracksActive C.moveMessages)
-        else do
-          logMessage $ T.pack (C.msgTracksHeader C.moveMessages)
-          mapM_ showTrack tracks
+-- | Carrega personagem existente
+loadCharacter :: ActionContext -> T.Text -> IO Bool
+loadCharacter aCtx@ActionContext { contextHandler, tuiOutputChannel } charName = do
+  if T.null charName
+    then do
+      systemMessage aCtx (C.msgCharacterNameRequired C.messages)
       return True
-      where
-        showTrack track = do
-          let boxes = Progress.getProgressScore track
-          let ticks = Progress.trackTicks track
-          let percentage = Progress.progressPercentage track
-          let formattedTrack = T.pack $ C.formatProgressTrack C.moveMessages
-                (Progress.trackName track)
-                (show $ Progress.trackType track)
-                (show $ Progress.trackRank track)
-                boxes
-                ticks
-                percentage
-                (Progress.trackCompleted track)
-          logMessage formattedTrack
-
-    abandonTrack input = withContext $ \ctx -> do
-      let trackName = parseTrackNameFromInput input
-
-      updatedCtx <- GameContext.removeProgressTrack contextHandler ctx trackName
-      _ <- GameContext.saveContext contextHandler updatedCtx
-      systemMessage $ C.msgTrackRemoved C.moveMessages <> trackName
-      return True
-
-    oracleQuery input = do
-      if T.null (T.strip input)
-        then listOracles
-        else queryOracle input
-
-    listOracles = do
-      oracles <- Oracle.listOracles oracleHandler
-      if null oracles
-        then logMessage $ C.msgNoOraclesLoaded C.moveMessages
-        else do
-          logMessage $ T.pack (C.msgOraclesHeader C.moveMessages)
-          mapM_ (logMessage . ("• " <>)) oracles
-      return True
-
-    queryOracle input = do
-      let (oracleName, maybeValue) = parseOracleQuery input
-      if T.null maybeValue
-        then rollOracleRandomly oracleName
-        else rollOracleWithGivenValue oracleName maybeValue
-
-    parseOracleQuery input =
-      case parseQuotedString input of
-        Just (name, rest) -> (name, T.strip rest)
-        Nothing ->
-          let parts = T.words input
-          in if null parts
-             then ("", "")
-             else (head parts, T.unwords (tail parts))
-
-    rollOracleRandomly oracleName = do
-      result <- Oracle.rollOracle oracleHandler oracleName
+    else do
+      result <- GameContext.loadContext contextHandler charName
       case result of
         Left err -> do
-          systemMessage $ T.pack (C.errOracleError C.errorMessages) <> T.pack (show err)
+          systemMessage aCtx (C.msgErrorLoading C.messages <> T.pack (show err))
           return True
-        Right oracleResult -> do
-          let formattedResult = T.pack $ C.formatOracleRoll C.moveMessages
-                                (Oracle.resultOracle oracleResult)
-                                (Oracle.resultRoll oracleResult)
-                                (Oracle.resultText oracleResult)
-          logMessage formattedResult
-          -- Save oracle result to session log
-          whenContext $ \ctx -> do
-            ctxWithLog <- GameContext.addLogEntry contextHandler ctx formattedResult
-            void $ GameContext.saveContext contextHandler ctxWithLog
-          executeOracleConsequence oracleResult
-          return True
+        Right ctx -> do
+          let msg = C.msgCharacterLoaded C.messages <> GameContext.getCharacterName ctx
+          systemMessage aCtx msg
 
-    rollOracleWithGivenValue oracleName valueText = do
-      case TR.decimal valueText of
-        Right (val, _) -> do
-          result <- Oracle.queryOracle oracleHandler oracleName val
-          case result of
-            Left err -> do
-              systemMessage $ T.pack (C.errOracleError C.errorMessages) <> T.pack (show err)
-              return True
-            Right oracleResult -> do
-              let formattedResult = T.pack $ C.formatOracleIndex C.moveMessages
-                                    (Oracle.resultOracle oracleResult)
-                                    (Oracle.resultRoll oracleResult)
-                                    (Oracle.resultText oracleResult)
-              logMessage formattedResult
-              -- Save oracle result to session log
-              whenContext $ \ctx -> do
-                ctxWithLog <- GameContext.addLogEntry contextHandler ctx formattedResult
-                void $ GameContext.saveContext contextHandler ctxWithLog
-              executeOracleConsequence oracleResult
-              return True
-        Left _ -> do
-          systemMessage $ T.pack (C.errInvalidValue C.errorMessages)
-          return True
+          -- Load and display session logs (reverse order - newest first)
+          let sessionLogs = reverse $ GameContext.getSessionLog contextHandler ctx
+          mapM_ (logMessage aCtx) sessionLogs
 
-    helpCommand input = do
-      let topic = T.strip input
-      if T.null topic
-        then do
-          helpText <- Help.showHelp helpHandler
-          logMessage (T.pack helpText)
-        else case Help.parseTopic helpHandler topic of
-          Just t -> do
-            helpText <- Help.showTopicHelp helpHandler t
-            logMessage (T.pack helpText)
-          Nothing -> do
-            logMessage $ "Tópico desconhecido: " <> topic
-            logMessage "Tópicos disponíveis: moves, progress, oracle, chaining, character"
-      return True
-
-    bondCommand input = withContext $ \ctx -> do
-      let parts = T.words input
-      case parts of
-        []            -> listBonds ctx
-        ("add":rest)    -> addBond (T.unwords rest) ctx
-        ("remove":rest) -> removeBond (T.unwords rest) ctx
-        ("check":rest)  -> checkBond (T.unwords rest) ctx
-        _               -> showBondUsage
-
-    listBonds ctx = do
-      let allBonds = GameContext.listBonds contextHandler ctx
-      if null allBonds
-        then logMessage "\nNenhum vínculo (bond) estabelecido."
-        else do
-          logMessage "\n=== Vínculos (Bonds) ==="
-          mapM_ showBond allBonds
-      return True
-
-    addBond input ctx = do
-      case parseQuotedString input of
-        Just (bondName, after) -> do
-          let afterParts = T.words after
-          let bondTypeText = if null afterParts then "person" else head afterParts
-          let notes = T.unwords (if null afterParts then [] else tail afterParts)
-
-          let bondType = case T.toLower bondTypeText of
-                "community" -> GameContext.CommunityBond
-                _           -> GameContext.PersonBond
-
-          let bond = GameContext.Bond bondName bondType notes
-          updatedCtx <- GameContext.addBond contextHandler ctx bond
-          _ <- GameContext.saveContext contextHandler updatedCtx
-
-          logMessage $ "\n✓ Vínculo criado: " <> bondName
-          return True
-        Nothing -> showBondUsage
-
-    removeBond input ctx = do
-      let bondName = maybe (T.unwords . T.words $ input) fst (parseQuotedString input)
-      updatedCtx <- GameContext.removeBond contextHandler ctx bondName
-      _ <- GameContext.saveContext contextHandler updatedCtx
-      logMessage $ "Vínculo removido: " <> bondName
-      return True
-
-    checkBond input ctx = do
-      let bondName = maybe (T.unwords . T.words $ input) fst (parseQuotedString input)
-      if GameContext.hasBond contextHandler ctx bondName
-        then logMessage $ "✓ Você tem vínculo com: " <> bondName
-        else logMessage $ "✗ Você NÃO tem vínculo com: " <> bondName
-      return True
-
-    showBondUsage = do
-      logMessage "Uso: :bond [add|remove|check] ou apenas :bond para listar"
-      return True
-
-    showBond bond = do
-      let typeStr = case GameContext.bondType bond of
-            GameContext.PersonBond    -> "Pessoa"
-            GameContext.CommunityBond -> "Comunidade"
-      logMessage $ "\n• " <> GameContext.bondName bond <> " (" <> T.pack typeStr <> ")"
-      unless (T.null $ GameContext.bondNotes bond) $
-        logMessage $ "  " <> GameContext.bondNotes bond
-
-    -- | Executa move triggered
-    executeTriggeredMove triggeredMove ctx = do
-      logMessage $ "\n>>> Executando " <> Move.moveTypeToText triggeredMove <> " automaticamente..."
-      (moveResult, updatedCtx) <- Move.executeMove moveHandler triggeredMove Nothing ctx contextHandler
-
-      let updatedRes = GameContext.resources (GameContext.mainCharacter updatedCtx)
-      ctxFinal <- GameContext.updateResources contextHandler updatedCtx updatedRes
-      _ <- GameContext.saveContext contextHandler ctxFinal
-
-      -- Verifica se gerou mais triggers (moves ou oráculos)
-      let moveTriggers = [m | Move.TriggerMove m <- Move.consequencesApplied moveResult]
-      let oracleTriggers = [o | Move.TriggerOracle o <- Move.consequencesApplied moveResult]
-
-      case (moveTriggers, oracleTriggers) of
-        (m:_, _) -> executeTriggeredMove m ctxFinal
-        ([], o:_) -> executeTriggeredOracle o ctxFinal
-        _ -> return True
-
-    -- | Executa oráculo triggered (verifica condições antes)
-    executeTriggeredOracle oracleName ctx = do
-      let char = GameContext.mainCharacter ctx
-      let res = GameContext.resources char
-
-      -- Verifica se deve executar o oráculo
-      let shouldExecute = case T.unpack oracleName of
-            "Endure Harm"   -> GameContext.health res == 0
-            "Endure Stress" -> GameContext.spirit res == 0
-            _               -> True  -- Outros oráculos sempre executam
-
-      if not shouldExecute
-        then do
-          -- Condição não atendida, apenas continua
+          -- Não adiciona ao log (apenas mensagem de sistema)
           _ <- GameContext.saveContext contextHandler ctx
+          atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter ctx))
           return True
-        else do
-          logMessage $ "\n🔮 Consultando oráculo " <> oracleName <> " automaticamente..."
-          result <- Oracle.rollOracle oracleHandler oracleName
-          case result of
-            Left err -> do
-              logMessage $ "Erro: " <> T.pack (show err)
-              _ <- GameContext.saveContext contextHandler ctx
-              return True
-            Right oracleResult -> do
-              logMessage $ "→ " <> Oracle.resultText oracleResult
 
-              -- Executa consequência automaticamente
-              executeOracleConsequence oracleResult
+-- | Mostra informações do personagem atual
+showCharacter :: ActionContext -> T.Text -> IO Bool
+showCharacter aCtx@ActionContext { tuiOutputChannel } _ = withContext aCtx $ \ctx -> do
+  let char = GameContext.mainCharacter ctx
+  atomically $ writeTChan tuiOutputChannel (CharacterUpdate char)
+  -- Don't log message to avoid spam from periodic updates
+  return True
 
-              _ <- GameContext.saveContext contextHandler ctx
-              return True
+-- | Atualiza atributo (define valor absoluto)
+updateAttribute :: ActionContext -> T.Text -> IO Bool
+updateAttribute aCtx@ActionContext { contextHandler, tuiOutputChannel } input = withContext aCtx $ \ctx -> do
+  let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
+  case parseAttributeUpdate input oldAttrs of
+    Nothing -> do
+      systemMessage aCtx (C.msgInvalidAttributeFormat C.messages)
+      return True
+    Just newAttrs -> do
+      updatedCtx <- GameContext.updateAttributes contextHandler ctx newAttrs
+      _ <- GameContext.saveContext contextHandler updatedCtx
+      systemMessage aCtx (C.msgAttributeUpdated C.messages)
+      atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter updatedCtx))
+      return True
 
-    -- | Executa consequência de resultado de oráculo AUTOMATICAMENTE
-    executeOracleConsequence oracleResult =
-      for_ (Oracle.resultConsequence oracleResult) $ \consText -> do
-        maybeCtx <- GameContext.getCurrentContext contextHandler
-        for_ maybeCtx $ \ctx -> do
-          let parts = T.splitOn ":" consText
-          case parts of
-            ("move":moveNameParts) -> do
-              let moveName = T.unwords moveNameParts
-              logMessage $ "\n  ⚡ Executando: :move " <> moveName
-              -- Executa o move automaticamente
-              _ <- Move.executeMove moveHandler
-                (fromMaybe Move.PayThePrice (Move.parseMoveType moveHandler moveName))
-                Nothing
-                ctx
-                contextHandler
-              return ()
+-- | Atualiza recurso (define valor absoluto)
+updateResource :: ActionContext -> T.Text -> IO Bool
+updateResource aCtx@ActionContext { contextHandler, tuiOutputChannel } input = withContext aCtx $ \ctx -> do
+  let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
+  case parseResourceUpdate input oldRes of
+    Nothing -> do
+      systemMessage aCtx (C.msgInvalidResourceFormat C.messages)
+      return True
+    Just newRes -> do
+      updatedCtx <- GameContext.updateResources contextHandler ctx newRes
+      _ <- GameContext.saveContext contextHandler updatedCtx
+      systemMessage aCtx (C.msgResourceUpdated C.messages)
+      atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter updatedCtx))
+      return True
 
-            ("resource":resName:valueParts) -> do
-              let valueText = T.unwords valueParts
-              -- Executa :addres automaticamente
-              let command = resName <> ":" <> valueText
-              let char = GameContext.mainCharacter ctx
-              let oldRes = GameContext.resources char
+-- | Adiciona/remove atributo (valor delta)
+addAttribute :: ActionContext -> T.Text -> IO Bool
+addAttribute aCtx@ActionContext { contextHandler, tuiOutputChannel } input = withContext aCtx $ \ctx -> do
+  let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
+  case parseAttributeAdd input oldAttrs of
+    Nothing -> do
+      systemMessage aCtx "Formato inválido. Use: atributo:delta (ex: iron:-1, edge:+2)"
+      return True
+    Just newAttrs -> do
+      updatedCtx <- GameContext.updateAttributes contextHandler ctx newAttrs
+      _ <- GameContext.saveContext contextHandler updatedCtx
+      systemMessage aCtx (C.msgAttributeUpdated C.messages)
+      atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter updatedCtx))
+      return True
 
-              for_ (parseResourceAdd command oldRes) $ \newRes -> do
-                updatedCtx <- GameContext.updateResources contextHandler ctx newRes
-                _ <- GameContext.saveContext contextHandler updatedCtx
-                logMessage $ "\n  ⚡ " <> resName <> ": " <> valueText <> " (aplicado)"
+-- | Adiciona/remove recurso (valor delta)
+addResource :: ActionContext -> T.Text -> IO Bool
+addResource aCtx@ActionContext { contextHandler, tuiOutputChannel } input = withContext aCtx $ \ctx -> do
+  let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
+  case parseResourceAdd input oldRes of
+    Nothing -> do
+      systemMessage aCtx "Formato inválido. Use: recurso:delta (ex: health:-1, momentum:+2)"
+      return True
+    Just newRes -> do
+      updatedCtx <- GameContext.updateResources contextHandler ctx newRes
+      _ <- GameContext.saveContext contextHandler updatedCtx
+      systemMessage aCtx (C.msgResourceUpdated C.messages)
+      atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter updatedCtx))
+      return True
 
-            _ -> logMessage $ "\n  ⚡ Consequência: " <> consText
+-- | Rola 1d6+2d10 e avalia resultado (challenge roll)
+
+-- Mover para DiceService
+challenge :: ActionContext -> T.Text -> IO Bool
+challenge aCtx@ActionContext { diceHandler } _ = do
+  -- Rola 1d6,2d10 automaticamente e avalia
+  rolls <- Dice.roll diceHandler "1d6,2d10"
+  case rolls of
+    [(_, actionDie), (_, ch1), (_, ch2)] -> do
+      let result = evaluateActionRoll actionDie ch1 ch2
+      let resultMsg = showActionRollResult result
+      let interpretation = case result of
+            Dice.StrongHit -> C.challengeStrongHit C.challengeInterpretation
+            Dice.WeakHit -> C.challengeWeakHit C.challengeInterpretation
+            Dice.Miss -> C.challengeMiss C.challengeInterpretation
+            Dice.InvalidRoll -> ""
+      let matchMsg = if ch1 == ch2 then C.challengeMatch C.challengeInterpretation else ""
+
+      let formattedMsg = T.pack $ C.formatActionRoll C.characterDisplay actionDie ch1 ch2 resultMsg
+                      ++ interpretation ++ matchMsg
+      logMessage aCtx formattedMsg
+
+      return True
+    _ -> do
+      logMessage aCtx "Erro ao rolar dados para challenge"
+      return True
+
+moveAction, swearVow, markProgress, rollProgress, showTracks, abandonTrack, oracleQuery, helpCommand, bondCommand :: ActionContext -> T.Text -> IO Bool
+moveAction _ _ = return True  -- TODO: Implement
+swearVow _ _ = return True    -- TODO: Implement
+markProgress _ _ = return True -- TODO: Implement
+rollProgress _ _ = return True -- TODO: Implement
+showTracks _ _ = return True   -- TODO: Implement
+abandonTrack _ _ = return True -- TODO: Implement
+oracleQuery _ _ = return True  -- TODO: Implement
+helpCommand _ _ = return True  -- TODO: Implement
+bondCommand _ _ = return True  -- TODO: Implement
 
 -- Parse atributos de uma lista de textos (ex: ["iron:3", "edge:2"])
 parseAttributes :: [T.Text] -> GameContext.Attributes
@@ -858,61 +397,3 @@ parseSignedDecimal valStr =
 -- | Limita um valor a um intervalo [low, high].
 clamp :: Int -> Int -> Int -> Int
 clamp low high x = max low (min high x)
-
--- | Verifica se uma consequência é um trigger de Pay the Price
-isPayThePriceTrigger :: Move.Consequence -> Bool
-isPayThePriceTrigger (Move.TriggerMove Move.PayThePrice) = True
-isPayThePriceTrigger _ = False
-
--- | Parse string entre aspas duplas
--- Retorna (conteúdo, resto após as aspas)
-parseQuotedString :: T.Text -> Maybe (T.Text, T.Text)
-parseQuotedString input =
-  case T.stripPrefix "\"" (T.stripStart input) of
-    Nothing -> Nothing
-    Just afterFirstQuote ->
-      case T.breakOn "\"" afterFirstQuote of
-        (content, rest) | not (T.null rest) ->
-          Just (content, T.drop 1 rest)  -- Remove a segunda aspa
-        _ -> Nothing
-
--- | Parse rank de challenge
-parseRank :: T.Text -> Maybe Progress.ChallengeRank
-parseRank text =
-  case T.toLower . T.strip $ text of
-    "troublesome" -> Just Progress.Troublesome
-    "dangerous" -> Just Progress.Dangerous
-    "formidable" -> Just Progress.Formidable
-    "extreme" -> Just Progress.Extreme
-    "epic" -> Just Progress.Epic
-    _ -> Nothing
-
--- | Interpreta resultado de Fulfill Your Vow
-interpretVowRoll :: (T.Text -> IO ()) -> Progress.ProgressRollResult -> IO ()
-interpretVowRoll logMessage result = do
-  logMessage "\n>>> Fulfill Your Vow <<<"
-  case Progress.progressRollResult result of
-    Dice.StrongHit -> logMessage $ T.pack (C.vowStrongHit C.progressInterpretation)
-    Dice.WeakHit -> logMessage $ T.pack (C.vowWeakHit C.progressInterpretation)
-    Dice.Miss -> logMessage $ T.pack (C.vowMiss C.progressInterpretation)
-    Dice.InvalidRoll -> logMessage $ T.pack (C.rollError C.progressInterpretation)
-
--- | Interpreta resultado de End the Fight
-interpretCombatRoll :: (T.Text -> IO ()) -> Progress.ProgressRollResult -> IO ()
-interpretCombatRoll logMessage result = do
-  logMessage "\n>>> End the Fight <<<"
-  case Progress.progressRollResult result of
-    Dice.StrongHit -> logMessage $ T.pack (C.combatStrongHit C.progressInterpretation)
-    Dice.WeakHit -> logMessage $ T.pack (C.combatWeakHit C.progressInterpretation)
-    Dice.Miss -> logMessage $ T.pack (C.combatMiss C.progressInterpretation)
-    Dice.InvalidRoll -> logMessage $ T.pack (C.rollError C.progressInterpretation)
-
--- | Interpreta resultado de Reach Your Destination
-interpretJourneyRoll :: (T.Text -> IO ()) -> Progress.ProgressRollResult -> IO ()
-interpretJourneyRoll logMessage result = do
-  logMessage "\n>>> Reach Your Destination <<<"
-  case Progress.progressRollResult result of
-    Dice.StrongHit -> logMessage $ T.pack (C.journeyStrongHit C.progressInterpretation)
-    Dice.WeakHit -> logMessage $ T.pack (C.journeyWeakHit C.progressInterpretation)
-    Dice.Miss -> logMessage $ T.pack (C.journeyMiss C.progressInterpretation)
-    Dice.InvalidRoll -> logMessage $ T.pack (C.rollError C.progressInterpretation)
