@@ -12,9 +12,10 @@ import qualified System.Constants as C
 import qualified Data.Text as T
 import qualified Data.ByteString.Lazy as BL
 import Data.Aeson (encode, decode)
-import Control.Exception (try, IOException)
-import Control.Concurrent.MVar (MVar, newMVar, modifyMVar, readMVar)
+import Control.Exception (try, IOException, bracket_, SomeException, catch)
+import Control.Concurrent.MVar (MVar, newMVar, modifyMVar, readMVar, modifyMVar_)
 import System.Directory (doesFileExist, removeFile)
+import qualified System.Util.SafeIO as SafeIO
 import Data.Time (getCurrentTime, formatTime, defaultTimeLocale)
 import Data.List (partition)
 
@@ -22,6 +23,17 @@ import Data.List (partition)
 newtype InternalHandle = InternalHandle
     { currentContext :: MVar (Maybe GameContext.Context)
     }
+
+-- | Safe wrapper for modifyMVar that handles exceptions
+-- Prevents deadlock if an exception occurs during modification
+safeModifyMVar :: MVar a -> (a -> IO (a, b)) -> IO (Either SomeException b)
+safeModifyMVar mvar f = 
+    try $ modifyMVar mvar f
+
+-- | Safe wrapper for modifyMVar_ that handles exceptions
+safeModifyMVar_ :: MVar a -> (a -> IO a) -> IO (Either SomeException ())
+safeModifyMVar_ mvar f = 
+    try $ modifyMVar_ mvar f
 
 -- | Cria um novo handle para o serviço de contexto
 newHandle :: IO GameContext.Handle
@@ -108,7 +120,7 @@ createContextImpl iHandle charName attrs = do
                             modifyMVar (currentContext iHandle) $ \_ -> return (Just context, ())
                             return $ Right context
 
--- | Carrega contexto de arquivo
+-- | Carrega contexto de arquivo (thread-safe)
 loadContextImpl :: InternalHandle -> T.Text -> IO (Either GameContext.ContextError GameContext.Context)
 loadContextImpl iHandle charName = do
     let fileName = getContextFileName charName
@@ -117,25 +129,30 @@ loadContextImpl iHandle charName = do
     if not exists
         then return $ Left (GameContext.FileError $ "Arquivo não encontrado: " ++ fileName)
         else do
-            result <- try (BL.readFile fileName) :: IO (Either IOException BL.ByteString)
+            -- Use safe file read to prevent race conditions
+            result <- SafeIO.safeReadFile fileName
             case result of
                 Left err -> return $ Left (GameContext.FileError $ show err)
                 Right contents ->
                     case decode contents of
                         Nothing -> return $ Left (GameContext.ParseError "Erro ao parsear JSON")
                         Just ctx -> do
-                            -- Atualiza contexto atual
-                            modifyMVar (currentContext iHandle) $ \_ -> return (Just ctx, ())
-                            return $ Right ctx
+                            -- Atualiza contexto atual (thread-safe)
+                            modifyResult <- safeModifyMVar (currentContext iHandle) $ \_ -> 
+                                return (Just ctx, ())
+                            case modifyResult of
+                                Left err -> return $ Left (GameContext.FileError $ "Erro ao atualizar contexto: " ++ show err)
+                                Right _ -> return $ Right ctx
 
--- | Salva contexto em arquivo
+-- | Salva contexto em arquivo (thread-safe)
 saveContextImpl :: GameContext.Context -> IO (Either GameContext.ContextError FilePath)
 saveContextImpl ctx = do
     let charName = GameContext.name . GameContext.mainCharacter $ ctx
     let fileName = getContextFileName charName
     let jsonContent = encode ctx
     
-    result <- try (BL.writeFile fileName jsonContent) :: IO (Either IOException ())
+    -- Use safe file write to prevent concurrent writes
+    result <- SafeIO.safeWriteFile fileName jsonContent
     case result of
         Left err -> return $ Left (GameContext.FileError $ show err)
         Right _ -> return $ Right fileName

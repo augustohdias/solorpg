@@ -11,7 +11,7 @@ import qualified System.HelpContract as Help
 import qualified System.Constants as C
 import qualified Data.Text as T
 import qualified Data.Text.Read as TR
-import System.Tui.Comm (GameOutput(..))
+import System.Tui.Comm (GameOutput(..), MessageType(..))
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
 import Data.Maybe (fromMaybe, listToMaybe)
 import Control.Monad (unless, void)
@@ -50,9 +50,13 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 
     defaultAction _ = return False
 
-    -- | Helper for sending log messages to the TUI
+    -- | Helper for sending narrative/game log messages to the TUI
     logMessage :: T.Text -> IO ()
-    logMessage msg = atomically $ writeTChan outputChan (LogEntry msg)
+    logMessage msg = atomically $ writeTChan outputChan (LogEntry msg NarrativeMessage)
+
+    -- | Helper for sending system notifications to the TUI
+    systemMessage :: T.Text -> IO ()
+    systemMessage msg = atomically $ writeTChan outputChan (LogEntry msg SystemMessage)
 
     -- | Executa uma ação que requer um contexto de personagem carregado.
     -- Mostra uma mensagem de erro se nenhum personagem estiver carregado.
@@ -61,7 +65,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       maybeCtx <- GameContext.getCurrentContext contextHandler
       case maybeCtx of
         Nothing -> do
-          logMessage (C.msgNoCharacterLoaded C.messages)
+          systemMessage (C.msgNoCharacterLoaded C.messages)
           return True
         Just ctx -> action ctx
 
@@ -102,7 +106,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       return True
 
     exit _ = do
-      logMessage (C.msgSessionEnded C.messages)
+      systemMessage (C.msgSessionEnded C.messages)
       atomically $ writeTChan outputChan GameEnd
       return False
 
@@ -112,7 +116,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       let parts = T.words input
       if null parts
         then do
-          logMessage (C.msgCharacterNameRequired C.messages)
+          systemMessage (C.msgCharacterNameRequired C.messages)
           return True
         else do
           let charName = head parts
@@ -124,11 +128,11 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
           result <- GameContext.createContext contextHandler charName attrs
           case result of
             Left err -> do
-              logMessage (C.msgErrorCreating C.messages <> T.pack (show err))
+              systemMessage (C.msgErrorCreating C.messages <> T.pack (show err))
               return True
             Right ctx -> do
               let msg = C.msgCharacterCreated C.messages <> GameContext.getCharacterName ctx
-              logMessage msg
+              systemMessage msg
 
               -- Não adiciona ao log (apenas mensagem de sistema)
               _ <- GameContext.saveContext contextHandler ctx
@@ -138,17 +142,21 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
     loadCharacter charName = do
       if T.null charName
         then do
-          logMessage (C.msgCharacterNameRequired C.messages)
+          systemMessage (C.msgCharacterNameRequired C.messages)
           return True
         else do
           result <- GameContext.loadContext contextHandler charName
           case result of
             Left err -> do
-              logMessage (C.msgErrorLoading C.messages <> T.pack (show err))
+              systemMessage (C.msgErrorLoading C.messages <> T.pack (show err))
               return True
             Right ctx -> do
               let msg = C.msgCharacterLoaded C.messages <> GameContext.getCharacterName ctx
-              logMessage msg
+              systemMessage msg
+
+              -- Load and display session logs (reverse order - newest first)
+              let sessionLogs = reverse $ GameContext.getSessionLog contextHandler ctx
+              mapM_ logMessage sessionLogs
 
               -- Não adiciona ao log (apenas mensagem de sistema)
               _ <- GameContext.saveContext contextHandler ctx
@@ -158,19 +166,19 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
     showCharacter _ = withContext $ \ctx -> do
       let char = GameContext.mainCharacter ctx
       atomically $ writeTChan outputChan (CharacterUpdate char)
-      logMessage "Character sheet updated."
+      -- Don't log message to avoid spam from periodic updates
       return True
 
     updateAttribute input = withContext $ \ctx -> do
       let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
       case parseAttributeUpdate input oldAttrs of
         Nothing -> do
-          logMessage (C.msgInvalidAttributeFormat C.messages)
+          systemMessage (C.msgInvalidAttributeFormat C.messages)
           return True
         Just newAttrs -> do
           updatedCtx <- GameContext.updateAttributes contextHandler ctx newAttrs
           _ <- GameContext.saveContext contextHandler updatedCtx
-          logMessage (C.msgAttributeUpdated C.messages)
+          systemMessage (C.msgAttributeUpdated C.messages)
           atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter updatedCtx))
           return True
 
@@ -178,12 +186,12 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
       case parseResourceUpdate input oldRes of
         Nothing -> do
-          logMessage (C.msgInvalidResourceFormat C.messages)
+          systemMessage (C.msgInvalidResourceFormat C.messages)
           return True
         Just newRes -> do
           updatedCtx <- GameContext.updateResources contextHandler ctx newRes
           _ <- GameContext.saveContext contextHandler updatedCtx
-          logMessage (C.msgResourceUpdated C.messages)
+          systemMessage (C.msgResourceUpdated C.messages)
           atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter updatedCtx))
           return True
 
@@ -191,12 +199,12 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
       case parseAttributeAdd input oldAttrs of
         Nothing -> do
-          logMessage "Formato inválido. Use: atributo:delta (ex: iron:-1, edge:+2)"
+          systemMessage "Formato inválido. Use: atributo:delta (ex: iron:-1, edge:+2)"
           return True
         Just newAttrs -> do
           updatedCtx <- GameContext.updateAttributes contextHandler ctx newAttrs
           _ <- GameContext.saveContext contextHandler updatedCtx
-          logMessage (C.msgAttributeUpdated C.messages)
+          systemMessage (C.msgAttributeUpdated C.messages)
           atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter updatedCtx))
           return True
 
@@ -204,12 +212,12 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
       case parseResourceAdd input oldRes of
         Nothing -> do
-          logMessage "Formato inválido. Use: recurso:delta (ex: health:-1, momentum:+2)"
+          systemMessage "Formato inválido. Use: recurso:delta (ex: health:-1, momentum:+2)"
           return True
         Just newRes -> do
           updatedCtx <- GameContext.updateResources contextHandler ctx newRes
           _ <- GameContext.saveContext contextHandler updatedCtx
-          logMessage (C.msgResourceUpdated C.messages)
+          systemMessage (C.msgResourceUpdated C.messages)
           atomically $ writeTChan outputChan (CharacterUpdate (GameContext.mainCharacter updatedCtx))
           return True
 
@@ -240,12 +248,12 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       let parts = T.words input
       case parts of
         [] -> do
-          logMessage $ T.pack (C.msgMoveUsage C.helpMessages)
+          systemMessage $ T.pack (C.msgMoveUsage C.helpMessages)
           return True
         (moveName:params) ->
           case Move.parseMoveType moveHandler moveName of
             Nothing -> do
-              logMessage $ "Move desconhecido: " <> T.unwords parts <> "\n" <> T.pack (C.msgMovesAvailable C.helpMessages)
+              systemMessage $ "Move desconhecido: " <> T.unwords parts <> "\n" <> T.pack (C.msgMovesAvailable C.helpMessages)
               return True
             Just moveType -> do
               let (maybeStat, cleanParams) = parseMoveParams params
@@ -279,9 +287,19 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
     executeStandardMove moveType maybeStat ctx = do
       (moveResult, updatedCtx) <- Move.executeMove moveHandler moveType maybeStat ctx contextHandler
 
+      -- Log the move result to session
+      let moveName = Move.moveTypeToText moveType
+      let resultText = case Move.rollResult moveResult of
+            Action.StrongHit -> "STRONG HIT"
+            Action.WeakHit -> "WEAK HIT"
+            Action.Miss -> "MISS"
+            Action.InvalidRoll -> "INVALID ROLL"
+      let moveLog = ">>> " <> moveName <> " - " <> T.pack resultText
+      ctxWithLog <- GameContext.addLogEntry contextHandler updatedCtx moveLog
+
       -- Salva o estado atualizado após o move
-      let updatedRes = GameContext.resources (GameContext.mainCharacter updatedCtx)
-      ctxWithUpdatedRes <- GameContext.updateResources contextHandler updatedCtx updatedRes
+      let updatedRes = GameContext.resources (GameContext.mainCharacter ctxWithLog)
+      ctxWithUpdatedRes <- GameContext.updateResources contextHandler ctxWithLog updatedRes
       _ <- GameContext.saveContext contextHandler ctxWithUpdatedRes
 
       -- Verifica se há moves triggered (PayThePrice, FaceDeath, etc)
@@ -298,7 +316,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
           let rankText = T.strip rest
           case parseRank rankText of
             Nothing -> do
-              logMessage $ T.pack (C.msgVowUsage C.moveMessages)
+              systemMessage $ T.pack (C.msgVowUsage C.moveMessages)
               return True
             Just rank -> do
               -- Cria track
@@ -315,7 +333,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
               logMessage $ T.pack $ C.formatVowCreated C.moveMessages vowName (show rank) (Progress.getTicksForRank rank)
               return True
         Nothing -> do
-          logMessage $ T.pack (C.msgVowUsage C.moveMessages)
+          systemMessage $ T.pack (C.msgVowUsage C.moveMessages)
           return True
 
     executeMoveFulfillVow input ctx = do
@@ -325,7 +343,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 
       case GameContext.getProgressTrack contextHandler ctx trackName of
         Nothing -> do
-          logMessage $ T.pack (C.errVowNotFound C.errorMessages) <> trackName
+          systemMessage $ T.pack (C.errVowNotFound C.errorMessages) <> trackName
           return True
         Just track -> do
           result <- Progress.rollProgress progressHandler track
@@ -356,7 +374,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 
       case GameContext.getProgressTrack contextHandler ctx trackName of
         Nothing -> do
-          logMessage $ C.msgTrackNotFound C.moveMessages <> trackName
+          systemMessage $ C.msgTrackNotFound C.moveMessages <> trackName
           return True
         Just track -> do
           result <- Progress.rollProgress progressHandler track
@@ -370,7 +388,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 
       case GameContext.getProgressTrack contextHandler ctx trackName of
         Nothing -> do
-          logMessage $ C.msgTrackNotFound C.moveMessages <> trackName
+          systemMessage $ C.msgTrackNotFound C.moveMessages <> trackName
           return True
         Just track -> do
           result <- Progress.rollProgress progressHandler track
@@ -400,13 +418,13 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 
       case GameContext.getProgressTrack contextHandler ctx trackName of
         Nothing -> do
-          logMessage $ T.pack (C.errVowNotFound C.errorMessages) <> trackName
+          systemMessage $ T.pack (C.errVowNotFound C.errorMessages) <> trackName
           return True
         Just track -> do
           updatedTrack <- Progress.markProgress progressHandler track
           updatedCtx <- GameContext.updateProgressTrack contextHandler ctx trackName updatedTrack
           _ <- GameContext.saveContext contextHandler updatedCtx
-          logMessage (C.msgProgressMarked C.moveMessages)
+          systemMessage (C.msgProgressMarked C.moveMessages)
           return True
 
     -- | Extrai o nome de um track do input do usuário (com ou sem aspas).
@@ -422,7 +440,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
           let rankText = T.strip rest
           case parseRank rankText of
             Nothing -> do
-              logMessage $ T.pack (C.errInvalidRank C.errorMessages) <> rankText <> "\n" <> T.pack (C.msgRanksAvailable C.helpMessages)
+              systemMessage $ T.pack (C.errInvalidRank C.errorMessages) <> rankText <> "\n" <> T.pack (C.msgRanksAvailable C.helpMessages)
               return True
             Just rank -> do
               let track = Progress.newProgressTrack vowName Progress.Vow rank
@@ -432,7 +450,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
               logMessage $ T.pack $ C.formatVowCreated C.moveMessages vowName (show rank) (Progress.getTicksForRank rank)
               return True
         Nothing -> do
-          logMessage $ T.pack (C.msgVowUsage C.moveMessages)
+          systemMessage $ T.pack (C.msgVowUsage C.moveMessages)
           return True
 
     markProgress input = withContext $ \ctx -> do
@@ -440,7 +458,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 
       case GameContext.getProgressTrack contextHandler ctx trackName of
         Nothing -> do
-          logMessage $ C.msgTrackNotFound C.moveMessages <> trackName <> "\n" <> T.pack (C.msgProgressUsage C.moveMessages)
+          systemMessage $ C.msgTrackNotFound C.moveMessages <> trackName <> "\n" <> T.pack (C.msgProgressUsage C.moveMessages)
           return True
         Just track -> do
           updatedTrack <- Progress.markProgress progressHandler track
@@ -454,7 +472,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 
       case GameContext.getProgressTrack contextHandler ctx trackName of
         Nothing -> do
-          logMessage $ C.msgTrackNotFound C.moveMessages <> trackName
+          systemMessage $ C.msgTrackNotFound C.moveMessages <> trackName
           return True
         Just track -> do
           result <- Progress.rollProgress progressHandler track
@@ -495,7 +513,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 
       updatedCtx <- GameContext.removeProgressTrack contextHandler ctx trackName
       _ <- GameContext.saveContext contextHandler updatedCtx
-      logMessage $ C.msgTrackRemoved C.moveMessages <> trackName
+      systemMessage $ C.msgTrackRemoved C.moveMessages <> trackName
       return True
 
     oracleQuery input = do
@@ -531,7 +549,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       result <- Oracle.rollOracle oracleHandler oracleName
       case result of
         Left err -> do
-          logMessage $ T.pack (C.errOracleError C.errorMessages) <> T.pack (show err)
+          systemMessage $ T.pack (C.errOracleError C.errorMessages) <> T.pack (show err)
           return True
         Right oracleResult -> do
           let formattedResult = T.pack $ C.formatOracleRoll C.moveMessages
@@ -539,6 +557,10 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
                                 (Oracle.resultRoll oracleResult)
                                 (Oracle.resultText oracleResult)
           logMessage formattedResult
+          -- Save oracle result to session log
+          whenContext $ \ctx -> do
+            ctxWithLog <- GameContext.addLogEntry contextHandler ctx formattedResult
+            void $ GameContext.saveContext contextHandler ctxWithLog
           executeOracleConsequence oracleResult
           return True
 
@@ -548,7 +570,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
           result <- Oracle.queryOracle oracleHandler oracleName val
           case result of
             Left err -> do
-              logMessage $ T.pack (C.errOracleError C.errorMessages) <> T.pack (show err)
+              systemMessage $ T.pack (C.errOracleError C.errorMessages) <> T.pack (show err)
               return True
             Right oracleResult -> do
               let formattedResult = T.pack $ C.formatOracleIndex C.moveMessages
@@ -556,10 +578,14 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
                                     (Oracle.resultRoll oracleResult)
                                     (Oracle.resultText oracleResult)
               logMessage formattedResult
+              -- Save oracle result to session log
+              whenContext $ \ctx -> do
+                ctxWithLog <- GameContext.addLogEntry contextHandler ctx formattedResult
+                void $ GameContext.saveContext contextHandler ctxWithLog
               executeOracleConsequence oracleResult
               return True
         Left _ -> do
-          logMessage $ T.pack (C.errInvalidValue C.errorMessages)
+          systemMessage $ T.pack (C.errInvalidValue C.errorMessages)
           return True
 
     helpCommand input = do
