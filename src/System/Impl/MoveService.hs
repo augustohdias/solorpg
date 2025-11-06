@@ -15,7 +15,7 @@ import qualified System.DiceContract as Dice
 import qualified Data.Text as T
 import qualified Data.Text.IO as TIO
 import qualified Data.Text.Read as TR
-import System.ActionContract (ActionRollResult (..))
+import System.DiceContract (RollResult (..))
 import Control.Monad (when, foldM)
 import System.IO (hFlush, stdout)
 import qualified Data.Maybe
@@ -133,21 +133,21 @@ getStatValue stat ctx =
     Move.Wits -> GameContext.wits attrs
 
 -- | Avalia rolagem
-evaluateRoll :: Int -> Int -> Int -> ActionRollResult
+evaluateRoll :: Int -> Int -> Int -> RollResult
 evaluateRoll action ch1 ch2
   | action > ch1 && action > ch2 = StrongHit
   | action > ch1 || action > ch2 = WeakHit
   | otherwise = Miss
 
 -- | Formata resultado
-showRollResult :: ActionRollResult -> String
+showRollResult :: RollResult -> String
 showRollResult StrongHit = "STRONG HIT ✓"
 showRollResult WeakHit = "WEAK HIT ~"
 showRollResult Miss = "MISS ✗"
 showRollResult InvalidRoll = "INVALID"
 
 -- | Retorna consequências de um move baseado no resultado
-getMoveConsequences :: Move.MoveType -> ActionRollResult -> Bool -> IO [Move.Consequence]
+getMoveConsequences :: Move.MoveType -> RollResult -> Bool -> IO [Move.Consequence]
 getMoveConsequences moveType result isMatch = do
   let baseConsequences = case moveType of
         -- Fate Moves
@@ -196,7 +196,7 @@ getMoveConsequences moveType result isMatch = do
 
 -- | Pay the Price - Sofra as consequências (baseado nas regras oficiais)
 -- O jogador NÃO rola dados neste move, ele ESCOLHE entre 3 opções
-getPayThePriceConsequences :: ActionRollResult -> Bool -> [Move.Consequence]
+getPayThePriceConsequences :: RollResult -> Bool -> [Move.Consequence]
 getPayThePriceConsequences _result _isMatch =
   [ Move.PlayerChoice
       [ Move.Choice "Fazer o resultado negativo mais óbvio acontecer (escolha narrativa)" 
@@ -211,7 +211,7 @@ getPayThePriceConsequences _result _isMatch =
   ]
 
 -- | Face Danger - Enfrente um perigo (CORRIGIDO conforme PDF)
-getFaceDangerConsequences :: ActionRollResult -> Bool -> [Move.Consequence]
+getFaceDangerConsequences :: RollResult -> Bool -> [Move.Consequence]
 getFaceDangerConsequences result isMatch =
   let matchPenalty = ([Move.LoseMomentum 1 | isMatch])
   in matchPenalty ++ case result of
@@ -243,7 +243,7 @@ getFaceDangerConsequences result isMatch =
       [Move.Narrative "Rolagem inválida."]
 
 -- | Gather Information - Colete informações (CORRIGIDO conforme PDF)
-getGatherInformationConsequences :: ActionRollResult -> Bool -> [Move.Consequence]
+getGatherInformationConsequences :: RollResult -> Bool -> [Move.Consequence]
 getGatherInformationConsequences result isMatch =
   let matchBonus = if isMatch then [Move.GainMomentum 1, Move.Narrative "Você descobre algo excepcional!"] else []
   in case result of
@@ -266,7 +266,7 @@ getGatherInformationConsequences result isMatch =
       [Move.Narrative "Rolagem inválida."]
 
 -- | Swear an Iron Vow - Jure um voto (roll +heart)
-getSwearIronVowConsequences :: ActionRollResult -> [Move.Consequence]
+getSwearIronVowConsequences :: RollResult -> [Move.Consequence]
 getSwearIronVowConsequences result = case result of
   StrongHit ->
     [ Move.GainMomentum 2
@@ -288,7 +288,7 @@ getSwearIronVowConsequences result = case result of
 
 -- | Undertake a Journey - Viaje (roll +wits)
 -- Se partindo de bond community, adiciona +1 no primeiro roll
-getUndertakeJourneyConsequences :: ActionRollResult -> [Move.Consequence]
+getUndertakeJourneyConsequences :: RollResult -> [Move.Consequence]
 getUndertakeJourneyConsequences result = case result of
   StrongHit ->
     [ Move.PlayerChoice
@@ -310,7 +310,7 @@ getUndertakeJourneyConsequences result = case result of
     [Move.Narrative "Rolagem inválida."]
 
 -- | Reach a Milestone - Alcance um marco
-getReachMilestoneConsequences :: ActionRollResult -> [Move.Consequence]
+getReachMilestoneConsequences :: RollResult -> [Move.Consequence]
 getReachMilestoneConsequences result = case result of
   StrongHit ->
     [ Move.Narrative "Marco alcançado! Marque progresso no seu voto."
@@ -325,7 +325,7 @@ getReachMilestoneConsequences result = case result of
     [Move.Narrative "Rolagem inválida."]
 
 -- | Secure an Advantage - Ganhe vantagem (CORRIGIDO conforme PDF)
-getSecureAdvantageConsequences :: ActionRollResult -> [Move.Consequence]
+getSecureAdvantageConsequences :: RollResult -> [Move.Consequence]
 getSecureAdvantageConsequences result = case result of
   StrongHit -> 
     [ Move.PlayerChoice
@@ -351,7 +351,7 @@ getSecureAdvantageConsequences result = case result of
 
 -- | Heal - Recupere health (CORRIGIDO - roll +wits, ou +wits/+iron menor se self)
 -- NOTA: Sistema de "wounded" não implementado (seria flag no Context)
-getHealConsequences :: ActionRollResult -> [Move.Consequence]
+getHealConsequences :: RollResult -> [Move.Consequence]
 getHealConsequences result = case result of
   StrongHit -> 
     [ Move.GainHealth 2
@@ -376,7 +376,7 @@ getHealConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Resupply - Recupere supply (CORRIGIDO conforme PDF - roll +wits)
-getResupplyConsequences :: ActionRollResult -> [Move.Consequence]
+getResupplyConsequences :: RollResult -> [Move.Consequence]
 getResupplyConsequences result = case result of
   StrongHit -> 
     [ Move.GainSupply 2
@@ -401,7 +401,7 @@ getResupplyConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Make Camp - Acampe (CORRIGIDO conforme PDF - roll +supply)
-getMakeCampConsequences :: ActionRollResult -> [Move.Consequence]
+getMakeCampConsequences :: RollResult -> [Move.Consequence]
 getMakeCampConsequences result = case result of
   StrongHit -> 
     [ Move.Narrative "Escolha DUAS opções:"
@@ -436,7 +436,7 @@ getMakeCampConsequences result = case result of
 
 -- | Compel - Persuadir (CORRIGIDO - roll +heart/+iron/+shadow)
 -- +1 se share bond
-getCompelConsequences :: ActionRollResult -> [Move.Consequence]
+getCompelConsequences :: RollResult -> [Move.Consequence]
 getCompelConsequences result = case result of
   StrongHit ->
     [ Move.GainMomentum 1
@@ -458,7 +458,7 @@ getCompelConsequences result = case result of
 
 -- | Sojourn - Descanse em comunidade (CORRIGIDO - roll +heart, +1 se bond)
 -- Strong Hit: Escolha 2 (ou 3 se bond). Weak Hit: Escolha 1 (ou 2 se bond)
-getSojournConsequences :: ActionRollResult -> [Move.Consequence]
+getSojournConsequences :: RollResult -> [Move.Consequence]
 getSojournConsequences result = case result of
   StrongHit ->
     [ Move.Narrative "Escolha DUAS das opções abaixo (+1 se tiver bond):"
@@ -494,7 +494,7 @@ getSojournConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Forge a Bond - Crie vínculo (roll +heart)
-getForgeABondConsequences :: ActionRollResult -> [Move.Consequence]
+getForgeABondConsequences :: RollResult -> [Move.Consequence]
 getForgeABondConsequences result = case result of
   StrongHit -> [Move.Narrative "Vínculo formado. Marque bond progress."]
   WeakHit -> [Move.Narrative "Eles pedem mais de você. Faça ou jure voto."]
@@ -502,7 +502,7 @@ getForgeABondConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Test Your Bond - Teste vínculo (roll +heart)
-getTestYourBondConsequences :: ActionRollResult -> [Move.Consequence]
+getTestYourBondConsequences :: RollResult -> [Move.Consequence]
 getTestYourBondConsequences result = case result of
   StrongHit ->
     [ Move.PlayerChoice
@@ -516,7 +516,7 @@ getTestYourBondConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Aid Your Ally - Ajude aliado (roll +heart)
-getAidYourAllyConsequences :: ActionRollResult -> [Move.Consequence]
+getAidYourAllyConsequences :: RollResult -> [Move.Consequence]
 getAidYourAllyConsequences result = case result of
   StrongHit -> 
     [ Move.AddBonus (GameContext.ActiveBonus GameContext.NextRoll 1 "Ajuda de Aliado")
@@ -531,7 +531,7 @@ getAidYourAllyConsequences result = case result of
 
 -- | Enter the Fray - Inicie combate (CORRIGIDO conforme PDF)
 -- Roll: +heart (facing), +shadow (ambush/surprise), +wits (ambushed)
-getEnterTheFrayConsequences :: ActionRollResult -> [Move.Consequence]
+getEnterTheFrayConsequences :: RollResult -> [Move.Consequence]
 getEnterTheFrayConsequences result = case result of
   StrongHit -> 
     [ Move.GainMomentum 2
@@ -556,7 +556,7 @@ getEnterTheFrayConsequences result = case result of
 
 -- | Strike - Ataque (CORRIGIDO - roll +iron close, +edge range)
 -- Requer: Iniciativa. Marca progress no combat track.
-getStrikeConsequences :: ActionRollResult -> [Move.Consequence]
+getStrikeConsequences :: RollResult -> [Move.Consequence]
 getStrikeConsequences result = case result of
   StrongHit ->
     [ Move.Narrative "Inflija dano +1. Você retém iniciativa."
@@ -577,7 +577,7 @@ getStrikeConsequences result = case result of
 
 -- | Clash - Defenda/Contra-ataque (CORRIGIDO - roll +iron close, +edge range)
 -- Requer: Inimigo com iniciativa. Marca progress no combat track.
-getClashConsequences :: ActionRollResult -> [Move.Consequence]
+getClashConsequences :: RollResult -> [Move.Consequence]
 getClashConsequences result = case result of
   StrongHit ->
     [ Move.PlayerChoice
@@ -602,7 +602,7 @@ getClashConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Turn the Tide - Vire o jogo
-getTurnTheTideConsequences :: ActionRollResult -> [Move.Consequence]
+getTurnTheTideConsequences :: RollResult -> [Move.Consequence]
 getTurnTheTideConsequences result = case result of
   StrongHit -> [Move.Narrative "Você retoma iniciativa. Resetar momentum para +2."]
   WeakHit -> [Move.Narrative "Não retoma iniciativa, mas pode continuar."]
@@ -612,7 +612,7 @@ getTurnTheTideConsequences result = case result of
 -- | Endure Harm - Sofra dano (roll +health ou +iron, o maior)
 -- NOTA: Este move é especial - precisa do valor de harm como parâmetro
 -- Implementação simplificada: apenas as consequências pós-rolagem
-getEndurHarmConsequences :: ActionRollResult -> [Move.Consequence]
+getEndurHarmConsequences :: RollResult -> [Move.Consequence]
 getEndurHarmConsequences result = case result of
   StrongHit ->
     [ Move.PlayerChoice
@@ -636,7 +636,7 @@ getEndurHarmConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Face Death - À beira da morte
-getFaceDeathConsequences :: ActionRollResult -> [Move.Consequence]
+getFaceDeathConsequences :: RollResult -> [Move.Consequence]
 getFaceDeathConsequences result = case result of
   StrongHit -> [Move.GainHealth 1, Move.Narrative "Você sobrevive por pouco. +1 health."]
   WeakHit -> [Move.Narrative "Você fica incapacitado ou morrendo. Aliado deve intervir."]
@@ -645,7 +645,7 @@ getFaceDeathConsequences result = case result of
 
 -- | Endure Stress - Sofra stress (roll +spirit ou +heart, o maior)
 -- Similar a Endure Harm mas para dano mental
-getEndurStressConsequences :: ActionRollResult -> [Move.Consequence]
+getEndurStressConsequences :: RollResult -> [Move.Consequence]
 getEndurStressConsequences result = case result of
   StrongHit -> 
     [ Move.PlayerChoice
@@ -669,7 +669,7 @@ getEndurStressConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Face Desolation - À beira do colapso
-getFaceDesolationConsequences :: ActionRollResult -> [Move.Consequence]
+getFaceDesolationConsequences :: RollResult -> [Move.Consequence]
 getFaceDesolationConsequences result = case result of
   StrongHit -> [Move.GainSpirit 1, Move.Narrative "Você encontra forças. +1 spirit."]
   WeakHit -> [Move.Narrative "Você está desfeito. Continue com desvantagem."]
@@ -677,7 +677,7 @@ getFaceDesolationConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Out of Supply - Sem suprimentos
-getOutOfSupplyConsequences :: ActionRollResult -> [Move.Consequence]
+getOutOfSupplyConsequences :: RollResult -> [Move.Consequence]
 getOutOfSupplyConsequences result = case result of
   StrongHit -> [Move.Narrative "Você se vira sem supply."]
   WeakHit -> [Move.LoseMomentum 1, Move.Narrative "Sofra -1 momentum."]
@@ -685,7 +685,7 @@ getOutOfSupplyConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Face a Setback - Revés em progress
-getFaceSetbackConsequences :: ActionRollResult -> [Move.Consequence]
+getFaceSetbackConsequences :: RollResult -> [Move.Consequence]
 getFaceSetbackConsequences result = case result of
   StrongHit -> [Move.Narrative "Você mantém seu progresso."]
   WeakHit -> [Move.Narrative "Perca metade do progresso (arredonde para cima)."]
@@ -693,7 +693,7 @@ getFaceSetbackConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Forsake Your Vow - Abandone voto
-getForsakeVowConsequences :: ActionRollResult -> [Move.Consequence]
+getForsakeVowConsequences :: RollResult -> [Move.Consequence]
 getForsakeVowConsequences result = case result of
   StrongHit -> [Move.Narrative "Você encontra redenção. +1 spirit."]
   WeakHit -> [Move.LoseSpirit 1, Move.Narrative "Sofra -1 spirit."]
@@ -701,7 +701,7 @@ getForsakeVowConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Advance - Ganhe XP
-getAdvanceConsequences :: ActionRollResult -> [Move.Consequence]
+getAdvanceConsequences :: RollResult -> [Move.Consequence]
 getAdvanceConsequences result = case result of
   StrongHit -> [Move.Narrative "Gaste 3 XP para adicionar asset ou upgrade."]
   WeakHit -> [Move.Narrative "Gaste XP (conforme regras)."]
@@ -709,12 +709,12 @@ getAdvanceConsequences result = case result of
   InvalidRoll -> [Move.Narrative "Rolagem inválida."]
 
 -- | Ask the Oracle - Consulte oráculo (não usa roll padrão)
-getAskOracleConsequences :: ActionRollResult -> [Move.Consequence]
+getAskOracleConsequences :: RollResult -> [Move.Consequence]
 getAskOracleConsequences _result =
   [Move.Narrative "Use :oracle \"Nome\" para consultar oráculos."]
 
 -- | Consequências padrão para moves não implementados
-getDefaultConsequences :: ActionRollResult -> [Move.Consequence]
+getDefaultConsequences :: RollResult -> [Move.Consequence]
 getDefaultConsequences result = case result of
   StrongHit -> [Move.Narrative "Sucesso total!"]
   WeakHit -> [Move.Narrative "Sucesso parcial."]

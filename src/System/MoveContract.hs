@@ -26,7 +26,7 @@ module System.MoveContract
 
 import qualified Data.Text as T
 import qualified System.GameContextContract as GameContext
-import System.ActionContract (ActionRollResult)
+import qualified System.DiceContract as Dice
 
 -- | Tipos de Moves implementados
 data MoveType
@@ -89,7 +89,7 @@ data Stat
 -- | Resultado de execução de um Move
 data MoveResult = MoveResult
   { moveExecuted :: MoveType
-  , rollResult :: ActionRollResult
+  , rollResult :: Dice.RollResult
   , actionDie :: Int
   , challengeDice :: (Int, Int)
   , modifier :: Int

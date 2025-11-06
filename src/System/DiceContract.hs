@@ -3,6 +3,7 @@ module System.DiceContract
     ( Handle (..)
     , DiceType (..)
     , Read (readsPrec)
+    , RollResult (..)
     , roll
     ) where
 import qualified Data.Text as T
@@ -32,3 +33,11 @@ roll diceHandler s = do
   case parseDiceString diceHandler s of
     Just diceList -> fmap concat (mapM (rollWith diceHandler) diceList)
     Nothing -> return []
+
+-- | Resultado de um Action Roll (Ironsworn)
+data RollResult
+  = StrongHit    -- ^ Action > ambos challenge dice
+  | WeakHit      -- ^ Action > apenas 1 challenge die
+  | Miss         -- ^ Action <= ambos challenge dice
+  | InvalidRoll  -- ^ Rolagem inválida
+  deriving (Eq, Show)

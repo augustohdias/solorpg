@@ -229,10 +229,10 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
           let result = evaluateActionRoll actionDie ch1 ch2
           let resultMsg = showActionRollResult result
           let interpretation = case result of
-                Action.StrongHit -> C.challengeStrongHit C.challengeInterpretation
-                Action.WeakHit -> C.challengeWeakHit C.challengeInterpretation
-                Action.Miss -> C.challengeMiss C.challengeInterpretation
-                Action.InvalidRoll -> ""
+                Dice.StrongHit -> C.challengeStrongHit C.challengeInterpretation
+                Dice.WeakHit -> C.challengeWeakHit C.challengeInterpretation
+                Dice.Miss -> C.challengeMiss C.challengeInterpretation
+                Dice.InvalidRoll -> ""
           let matchMsg = if ch1 == ch2 then C.challengeMatch C.challengeInterpretation else ""
 
           let formattedMsg = T.pack $ C.formatActionRoll C.characterDisplay actionDie ch1 ch2 resultMsg
@@ -290,10 +290,10 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       -- Log the move result to session
       let moveName = Move.moveTypeToText moveType
       let resultText = case Move.rollResult moveResult of
-            Action.StrongHit -> "STRONG HIT"
-            Action.WeakHit -> "WEAK HIT"
-            Action.Miss -> "MISS"
-            Action.InvalidRoll -> "INVALID ROLL"
+            Dice.StrongHit -> "STRONG HIT"
+            Dice.WeakHit -> "WEAK HIT"
+            Dice.Miss -> "MISS"
+            Dice.InvalidRoll -> "INVALID ROLL"
       let moveLog = ">>> " <> moveName <> " - " <> T.pack resultText
       ctxWithLog <- GameContext.addLogEntry contextHandler updatedCtx moveLog
 
@@ -351,8 +351,8 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 
           -- Se strong ou weak hit, completa o track
           case Progress.progressRollResult result of
-            Action.StrongHit -> void $ completeTrackAndUpdateContext track
-            Action.WeakHit   -> void $ completeTrackAndUpdateContext track
+            Dice.StrongHit -> void $ completeTrackAndUpdateContext track
+            Dice.WeakHit   -> void $ completeTrackAndUpdateContext track
             _                -> return ()
 
           return True
@@ -823,18 +823,18 @@ parseAttributeAdd input attrs = do
     _        -> Nothing
 
 -- | Avalia o resultado de um Action Roll (Ironsworn)
-evaluateActionRoll :: Int -> Int -> Int -> Action.ActionRollResult
+evaluateActionRoll :: Int -> Int -> Int -> Dice.RollResult
 evaluateActionRoll actionDie challenge1 challenge2
-  | actionDie > challenge1 && actionDie > challenge2 = Action.StrongHit
-  | actionDie > challenge1 || actionDie > challenge2 = Action.WeakHit
-  | otherwise = Action.Miss
+  | actionDie > challenge1 && actionDie > challenge2 = Dice.StrongHit
+  | actionDie > challenge1 || actionDie > challenge2 = Dice.WeakHit
+  | otherwise = Dice.Miss
 
 -- | Converte ActionRollResult para string legível
-showActionRollResult :: Action.ActionRollResult -> String
-showActionRollResult Action.StrongHit = "STRONG HIT"
-showActionRollResult Action.WeakHit = "WEAK HIT"
-showActionRollResult Action.Miss = "MISS"
-showActionRollResult Action.InvalidRoll = "INVALID ROLL"
+showActionRollResult :: Dice.RollResult -> String
+showActionRollResult Dice.StrongHit = "STRONG HIT"
+showActionRollResult Dice.WeakHit = "WEAK HIT"
+showActionRollResult Dice.Miss = "MISS"
+showActionRollResult Dice.InvalidRoll = "INVALID ROLL"
 
 -- | Funções auxiliares de parsing
 parseKeyValue :: T.Text -> Maybe (T.Text, T.Text)
@@ -892,27 +892,27 @@ interpretVowRoll :: (T.Text -> IO ()) -> Progress.ProgressRollResult -> IO ()
 interpretVowRoll logMessage result = do
   logMessage "\n>>> Fulfill Your Vow <<<"
   case Progress.progressRollResult result of
-    Action.StrongHit -> logMessage $ T.pack (C.vowStrongHit C.progressInterpretation)
-    Action.WeakHit -> logMessage $ T.pack (C.vowWeakHit C.progressInterpretation)
-    Action.Miss -> logMessage $ T.pack (C.vowMiss C.progressInterpretation)
-    Action.InvalidRoll -> logMessage $ T.pack (C.rollError C.progressInterpretation)
+    Dice.StrongHit -> logMessage $ T.pack (C.vowStrongHit C.progressInterpretation)
+    Dice.WeakHit -> logMessage $ T.pack (C.vowWeakHit C.progressInterpretation)
+    Dice.Miss -> logMessage $ T.pack (C.vowMiss C.progressInterpretation)
+    Dice.InvalidRoll -> logMessage $ T.pack (C.rollError C.progressInterpretation)
 
 -- | Interpreta resultado de End the Fight
 interpretCombatRoll :: (T.Text -> IO ()) -> Progress.ProgressRollResult -> IO ()
 interpretCombatRoll logMessage result = do
   logMessage "\n>>> End the Fight <<<"
   case Progress.progressRollResult result of
-    Action.StrongHit -> logMessage $ T.pack (C.combatStrongHit C.progressInterpretation)
-    Action.WeakHit -> logMessage $ T.pack (C.combatWeakHit C.progressInterpretation)
-    Action.Miss -> logMessage $ T.pack (C.combatMiss C.progressInterpretation)
-    Action.InvalidRoll -> logMessage $ T.pack (C.rollError C.progressInterpretation)
+    Dice.StrongHit -> logMessage $ T.pack (C.combatStrongHit C.progressInterpretation)
+    Dice.WeakHit -> logMessage $ T.pack (C.combatWeakHit C.progressInterpretation)
+    Dice.Miss -> logMessage $ T.pack (C.combatMiss C.progressInterpretation)
+    Dice.InvalidRoll -> logMessage $ T.pack (C.rollError C.progressInterpretation)
 
 -- | Interpreta resultado de Reach Your Destination
 interpretJourneyRoll :: (T.Text -> IO ()) -> Progress.ProgressRollResult -> IO ()
 interpretJourneyRoll logMessage result = do
   logMessage "\n>>> Reach Your Destination <<<"
   case Progress.progressRollResult result of
-    Action.StrongHit -> logMessage $ T.pack (C.journeyStrongHit C.progressInterpretation)
-    Action.WeakHit -> logMessage $ T.pack (C.journeyWeakHit C.progressInterpretation)
-    Action.Miss -> logMessage $ T.pack (C.journeyMiss C.progressInterpretation)
-    Action.InvalidRoll -> logMessage $ T.pack (C.rollError C.progressInterpretation)
+    Dice.StrongHit -> logMessage $ T.pack (C.journeyStrongHit C.progressInterpretation)
+    Dice.WeakHit -> logMessage $ T.pack (C.journeyWeakHit C.progressInterpretation)
+    Dice.Miss -> logMessage $ T.pack (C.journeyMiss C.progressInterpretation)
+    Dice.InvalidRoll -> logMessage $ T.pack (C.rollError C.progressInterpretation)

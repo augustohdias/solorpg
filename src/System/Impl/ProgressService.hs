@@ -11,7 +11,7 @@ module System.Impl.ProgressService (newHandle) where
 import qualified System.ProgressContract as Progress
 import qualified System.DiceContract as Dice
 import qualified Data.Text as T
-import System.ActionContract (ActionRollResult (..))
+import System.DiceContract (RollResult (..))
 import Control.Monad (when)
 
 -- | Cria novo handle para o serviço de Progress
@@ -106,14 +106,14 @@ clearTrackImpl track = do
   return $ track { Progress.trackTicks = 0, Progress.trackCompleted = False }
 
 -- | Avalia progress roll
-evaluateProgressRoll :: Int -> Int -> Int -> ActionRollResult
+evaluateProgressRoll :: Int -> Int -> Int -> Dice.RollResult
 evaluateProgressRoll score ch1 ch2
   | score > ch1 && score > ch2 = StrongHit
   | score > ch1 || score > ch2 = WeakHit
   | otherwise = Miss
 
 -- | Formata resultado de progress roll
-showProgressResult :: ActionRollResult -> String
+showProgressResult :: Dice.RollResult -> String
 showProgressResult StrongHit = "STRONG HIT ✓"
 showProgressResult WeakHit = "WEAK HIT ~"
 showProgressResult Miss = "MISS ✗"

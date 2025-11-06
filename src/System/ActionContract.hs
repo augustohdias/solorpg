@@ -1,11 +1,29 @@
 module System.ActionContract
   ( Handle (..),
     ActionType (..),
-    ActionRollResult (..),
+    ActionContext(..),
   )
 where
 
 import qualified Data.Text as T
+import qualified System.DiceContract as Dice
+import qualified System.GameContextContract as GameContext
+import qualified System.MoveContract as Move
+import qualified System.ProgressContract as Progress
+import qualified System.OracleContract as Oracle
+import qualified System.HelpContract as Help
+import System.Tui.Comm (GameOutput)
+import Control.Concurrent.STM (TChan)
+
+data ActionContext = ActionContext
+  { diceHandler :: Dice.Handle
+  , contextHandler :: GameContext.Handle
+  , moveHandler :: Move.Handle
+  , progressHandler :: Progress.Handle
+  , oracleHandler :: Oracle.Handle
+  , helpHandler :: Help.Handle
+  , tuiOutputChannel :: TChan GameOutput
+  }
 
 data ActionType
   = RollDice            -- ^ Rola dados (ex: "3d6,2d10")
@@ -33,14 +51,6 @@ data ActionType
   | Unknown             -- ^ Ação desconhecida
   deriving (Show, Eq)
 
-data Handle = Handle
+newtype Handle = Handle
   { process :: ActionType -> T.Text -> IO Bool
   }
-
--- | Resultado de um Action Roll (Ironsworn)
-data ActionRollResult
-  = StrongHit    -- ^ Action > ambos challenge dice
-  | WeakHit      -- ^ Action > apenas 1 challenge die
-  | Miss         -- ^ Action <= ambos challenge dice
-  | InvalidRoll  -- ^ Rolagem inválida
-  deriving (Eq, Show)

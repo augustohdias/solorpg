@@ -32,7 +32,7 @@ module System.ProgressContract
 import qualified Data.Text as T
 import GHC.Generics (Generic)
 import Data.Aeson (ToJSON, FromJSON)
-import System.ActionContract (ActionRollResult)
+import qualified System.DiceContract as Dice
 
 -- | Rank de desafio (dificuldade)
 data ChallengeRank
@@ -64,7 +64,7 @@ data ProgressTrack = ProgressTrack
 data ProgressRollResult = ProgressRollResult
   { progressScore :: Int                    -- ^ Score (boxes completos)
   , progressChallengeDice :: (Int, Int)     -- ^ Challenge dice rolados
-  , progressRollResult :: ActionRollResult  -- ^ Resultado (Strong/Weak/Miss)
+  , progressRollResult :: Dice.RollResult  -- ^ Resultado (Strong/Weak/Miss)
   , progressMatch :: Bool                   -- ^ Se houve match
   } deriving (Eq, Show)
 
