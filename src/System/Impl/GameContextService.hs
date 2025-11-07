@@ -10,10 +10,9 @@ import qualified System.GameContextContract as GameContext
 import qualified System.ProgressContract as Progress
 import qualified System.Constants as C
 import qualified Data.Text as T
-import qualified Data.ByteString.Lazy as BL
 import Data.Aeson (encode, decode)
-import Control.Exception (try, IOException, bracket_, SomeException, catch)
-import Control.Concurrent.MVar (MVar, newMVar, modifyMVar, readMVar, modifyMVar_)
+import Control.Exception (try, IOException, SomeException)
+import Control.Concurrent.MVar (MVar, newMVar, modifyMVar, readMVar)
 import System.Directory (doesFileExist, removeFile)
 import qualified System.Util.SafeIO as SafeIO
 import Data.Time (getCurrentTime, formatTime, defaultTimeLocale)
@@ -30,10 +29,6 @@ safeModifyMVar :: MVar a -> (a -> IO (a, b)) -> IO (Either SomeException b)
 safeModifyMVar mvar f = 
     try $ modifyMVar mvar f
 
--- | Safe wrapper for modifyMVar_ that handles exceptions
-safeModifyMVar_ :: MVar a -> (a -> IO a) -> IO (Either SomeException ())
-safeModifyMVar_ mvar f = 
-    try $ modifyMVar_ mvar f
 
 -- | Cria um novo handle para o serviço de contexto
 newHandle :: IO GameContext.Handle

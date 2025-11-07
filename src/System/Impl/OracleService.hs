@@ -24,6 +24,7 @@ import Control.Exception (try, IOException)
 import Control.Concurrent.MVar (MVar, newMVar, modifyMVar, readMVar)
 import System.Directory (listDirectory, doesDirectoryExist)
 import System.FilePath ((</>), takeExtension)
+import Control.Monad (when)
 
 -- | Handle interno com cache de oráculos
 data InternalHandle = InternalHandle
@@ -41,10 +42,10 @@ newHandle oraclesPath diceH = do
         , oraclesDir = oraclesPath
         , diceHandle = diceH
         }
-  
+
   -- Carrega oráculos automaticamente
   _ <- loadAllOracles iHandle
-  
+
   return $ Oracle.Handle
     { Oracle.loadOracle = loadOracleImpl iHandle
     , Oracle.queryOracle = queryOracleImpl iHandle
@@ -53,25 +54,16 @@ newHandle oraclesPath diceH = do
     , Oracle.showOracle = showOracleImpl iHandle
     }
 
--- | Carrega todos os oráculos do diretório
+-- | Carrega todos os oráculos do diretório (silencioso - sem I/O direto)
 loadAllOracles :: InternalHandle -> IO ()
 loadAllOracles iHandle = do
   dirExists <- doesDirectoryExist (oraclesDir iHandle)
-  if not dirExists
-    then putStrLn $ "Diretório de oráculos não encontrado: " ++ oraclesDir iHandle
-    else do
-      files <- try (listDirectory (oraclesDir iHandle)) :: IO (Either IOException [FilePath])
-      case files of
-        Left err -> putStrLn $ "Erro ao ler diretório: " ++ show err
-        Right fileList -> do
-          let jsonFiles = filter (\f -> takeExtension f == ".json") fileList
-          putStrLn $ "Carregando " ++ show (length jsonFiles) ++ " oráculo(s)..."
-          mapM_ (\f -> do
-            result <- loadOracleImpl iHandle (oraclesDir iHandle </> f)
-            case result of
-              Left err -> putStrLn $ "Erro ao carregar " ++ f ++ ": " ++ show err
-              Right oracle -> putStrLn $ "✓ " ++ T.unpack (Oracle.oracleName oracle)
-            ) jsonFiles
+  when dirExists $ do
+    (try (listDirectory (oraclesDir iHandle)) :: IO (Either IOException [FilePath])) >>= either
+      (const $ return ())  -- Erro de diretório - silencioso
+      (loadJsonFiles . filter ((== ".json") . takeExtension))
+  where
+    loadJsonFiles = mapM_ (loadOracleImpl iHandle . (oraclesDir iHandle </>))
 
 -- | Carrega oráculo de arquivo
 loadOracleImpl :: InternalHandle -> FilePath -> IO (Either Oracle.OracleError Oracle.Oracle)
@@ -94,7 +86,7 @@ queryOracleImpl iHandle oracleName rollValue = do
   cache <- readMVar (oracleCache iHandle)
   case Map.lookup oracleName cache of
     Nothing -> return $ Left (Oracle.OracleNotFound oracleName)
-    Just oracle -> 
+    Just oracle ->
       case findEntry rollValue (Oracle.oracleEntries oracle) of
         Nothing -> return $ Left (Oracle.InvalidRollValue rollValue)
         Just entry -> return $ Right $ Oracle.OracleResult
@@ -102,6 +94,7 @@ queryOracleImpl iHandle oracleName rollValue = do
           , Oracle.resultRoll = rollValue
           , Oracle.resultText = Oracle.entryText entry
           , Oracle.resultConsequence = Oracle.entryConsequence entry
+          , Oracle.resultConsequences = Oracle.entryConsequences entry
           }
 
 -- | Encontra entrada que contém o valor

@@ -13,8 +13,7 @@ import qualified Data.Vector as Vec
 import Data.Text.Zipper (clearZipper)
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
-import Control.Monad (forever, void, when)
-import Data.IORef (newIORef, readIORef, writeIORef)
+import Control.Monad (forever, void)
 import Data.List (intersperse)
 import System.Tui.Comm (GameOutput(..), MessageType(..))
 import qualified System.GameContextContract as GameContext

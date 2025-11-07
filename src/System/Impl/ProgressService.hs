@@ -68,14 +68,12 @@ rollProgressImpl diceH track = do
     [(_, ch1), (_, ch2)] -> do
       let rollResult = evaluateProgressRoll score ch1 ch2
       let isMatch = ch1 == ch2
-      
+      -- TODO adaptar para comunicação via TUI-> retornar para ActionService e ActionService enviar para TUI
       putStrLn "\n=== Progress Roll ==="
       putStrLn $ "Progress Score: " ++ show score ++ " (" ++ show (Progress.trackTicks track) ++ " ticks)"
       putStrLn $ "Challenge Dice: " ++ show ch1 ++ ", " ++ show ch2
-      
       when isMatch $
         putStrLn "⚠ MATCH!"
-      
       putStrLn $ "\nResultado: " ++ showProgressResult rollResult
       
       return $ Progress.ProgressRollResult
@@ -118,4 +116,3 @@ showProgressResult StrongHit = "STRONG HIT ✓"
 showProgressResult WeakHit = "WEAK HIT ~"
 showProgressResult Miss = "MISS ✗"
 showProgressResult InvalidRoll = "INVALID"
-

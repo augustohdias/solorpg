@@ -4,7 +4,9 @@ module System.DiceContract
     , DiceType (..)
     , Read (readsPrec)
     , RollResult (..)
+    , ChallengeResult (..)
     , roll
+    , formatChallengeResult
     ) where
 import qualified Data.Text as T
 
@@ -23,9 +25,18 @@ instance Read DiceType where
   readsPrec _ "100" = [(D100, "")]
   readsPrec _ _ = []
 
+data ChallengeResult = ChallengeResult
+  { challengeActionDie :: Int
+  , challengeDie1 :: Int
+  , challengeDie2 :: Int
+  , challengeRollResult :: RollResult
+  , challengeMatch :: Bool
+  } deriving (Show)
+
 data Handle = Handle 
     { rollWith :: (Int, DiceType) -> IO [(DiceType, Int)]
     , parseDiceString :: T.Text -> Maybe [(Int, DiceType)]
+    , challengeRoll :: IO (Either T.Text ChallengeResult)
     }
 
 roll :: Handle -> T.Text -> IO [(DiceType, Int)]
@@ -41,3 +52,35 @@ data RollResult
   | Miss         -- ^ Action <= ambos challenge dice
   | InvalidRoll  -- ^ Rolagem inválida
   deriving (Eq, Show)
+
+-- | Formata o resultado de um challenge roll
+formatChallengeResult :: ChallengeResult 
+                      -> (Int -> Int -> Int -> String -> String)  -- formatActionRoll
+                      -> String  -- challengeStrongHit
+                      -> String  -- challengeWeakHit
+                      -> String  -- challengeMiss
+                      -> String  -- challengeMatch
+                      -> T.Text
+formatChallengeResult result formatActionRoll strongHit weakHit miss matchMsg =
+  let ChallengeResult { challengeActionDie = actionDie
+                      , challengeDie1 = ch1
+                      , challengeDie2 = ch2
+                      , challengeRollResult = rollResult
+                      , challengeMatch = hasMatch
+                      } = result
+  
+      resultMsg = case rollResult of
+        StrongHit -> "STRONG HIT"
+        WeakHit -> "WEAK HIT"
+        Miss -> "MISS"
+        InvalidRoll -> "INVALID ROLL"
+  
+      interpretation = case rollResult of
+        StrongHit -> strongHit
+        WeakHit -> weakHit
+        Miss -> miss
+        InvalidRoll -> ""
+  
+      match = if hasMatch then matchMsg else ""
+  
+  in T.pack $ formatActionRoll actionDie ch1 ch2 resultMsg ++ interpretation ++ match
