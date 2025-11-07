@@ -1,10 +1,11 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE OverloadedStrings #-}
 {- | GameContext Service - Gerencia o contexto do jogo incluindo personagem principal e mundo.
      
      Este serviço é responsável por:
      - Criar e gerenciar o personagem principal
-     - Salvar e carregar o contexto em arquivos JSON (formato: <nome_personagem>.slg)
+     - Salvar e carregar o contexto em arquivos JSON (formato: <nome_personagem>.json)
      - Atualizar atributos e recursos do personagem
      - Gerenciar o estado do mundo do jogo
      
@@ -34,7 +35,8 @@ module System.GameContextContract
 
 import qualified Data.Text as T
 import GHC.Generics (Generic)
-import Data.Aeson (ToJSON, FromJSON)
+import Data.Aeson (ToJSON, FromJSON, parseJSON, withObject, (.:), (.:?))
+import Data.Maybe (fromMaybe)
 import qualified Data.Maybe
 import qualified System.ProgressContract as Progress
 
@@ -56,11 +58,12 @@ data ActiveBonus = ActiveBonus
 data BondType
   = PersonBond      -- ^ Vínculo com pessoa
   | CommunityBond   -- ^ Vínculo com comunidade
+  | PlaceBond       -- ^ Vínculo com lugar
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
--- | Vínculo com pessoa ou comunidade
+-- | Vínculo com pessoa, comunidade ou lugar
 data Bond = Bond
-  { bondName :: !T.Text       -- ^ Nome da pessoa/comunidade
+  { bondName :: !T.Text       -- ^ Nome da pessoa/comunidade/lugar
   , bondType :: !BondType     -- ^ Tipo do vínculo
   , bondNotes :: !T.Text      -- ^ Notas sobre o vínculo
   } deriving (Eq, Show, Generic, ToJSON, FromJSON)
@@ -102,8 +105,22 @@ data Context = Context
     , sessionLog :: ![T.Text]           -- ^ Histórico de eventos do jogo
     , progressTracks :: ![Progress.ProgressTrack]  -- ^ Tracks ativos (vows, combats, journeys)
     , activeBonuses :: ![ActiveBonus]   -- ^ Bônus ativos temporários
-    , bonds :: ![Bond]                  -- ^ Vínculos com pessoas e comunidades
-    } deriving (Show, Eq, Generic, ToJSON, FromJSON)
+    , bonds :: ![Bond]                  -- ^ Vínculos com pessoas, comunidades e lugares
+    } deriving (Show, Eq, Generic, ToJSON)
+
+-- | Instância customizada de FromJSON para Context
+-- Garante que o campo 'bonds' seja inicializado como lista vazia se não existir no JSON
+-- (compatibilidade com arquivos antigos criados antes da implementação de bonds)
+instance FromJSON Context where
+  parseJSON = withObject "Context" $ \v -> do
+    mc <- v .: "mainCharacter"
+    w <- v .: "world"
+    sl <- v .: "sessionLog"
+    pt <- v .: "progressTracks"
+    ab <- v .: "activeBonuses"
+    maybeBonds <- v .:? "bonds"
+    let _bonds = fromMaybe [] maybeBonds
+    return $ Context mc w sl pt ab _bonds
 
 -- | Erros possíveis ao manipular contexto
 data ContextError
@@ -184,6 +201,9 @@ data Handle = Handle
     
     -- | Lista todos os bonds
     , listBonds :: !(Context -> [Bond])
+    
+    -- | Atualiza bond existente
+    , updateBond :: !(Context -> T.Text -> Bond -> IO Context)
 
     -- | Remove o arquivo de contexto
     , deleteContext :: !(T.Text -> IO (Either ContextError ()))

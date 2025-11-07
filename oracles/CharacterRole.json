@@ -1,0 +1,27 @@
+{
+  "oracleName": "Papel de Personagem",
+  "oracleDescription": "Papéis de personagens NPCs (Oráculo 10)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 5], "entryText": "Criminoso"},
+    {"entryRange": [6, 10], "entryText": "Curandeiro"},
+    {"entryRange": [11, 15], "entryText": "Bandido"},
+    {"entryRange": [16, 20], "entryText": "Guia"},
+    {"entryRange": [21, 25], "entryText": "Artista"},
+    {"entryRange": [26, 30], "entryText": "Mineiro"},
+    {"entryRange": [31, 35], "entryText": "Místico"},
+    {"entryRange": [36, 40], "entryText": "Sacerdote"},
+    {"entryRange": [41, 45], "entryText": "Marinheiro"},
+    {"entryRange": [46, 50], "entryText": "Batedor"},
+    {"entryRange": [51, 55], "entryText": "Erudito"},
+    {"entryRange": [56, 60], "entryText": "Soldado"},
+    {"entryRange": [61, 65], "entryText": "Mercador"},
+    {"entryRange": [66, 70], "entryText": "Guerreiro"},
+    {"entryRange": [71, 75], "entryText": "Caçador"},
+    {"entryRange": [76, 80], "entryText": "Saqueador"},
+    {"entryRange": [81, 85], "entryText": "Governante"},
+    {"entryRange": [86, 90], "entryText": "Espião"},
+    {"entryRange": [91, 95], "entryText": "Capanga"},
+    {"entryRange": [96, 100], "entryText": "Guardião"}
+  ]
+}

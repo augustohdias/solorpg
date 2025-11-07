@@ -1,0 +1,47 @@
+SOLORPG - AJUDA GERAL
+
+COMANDOS:
+Texto sem ":" = entrada narrativa
+:help [tópico] - ajuda
+:exit/:q/:quit - sair
+:show - log completo
+
+PERSONAGEM:
+:create <nome> - cria
+:load <nome> - carrega
+:char - mostra ficha
+:setattr <attr>:<val> - define atributo
+:setres <rec>:<val> - define recurso
+:addattr <attr>:<delta> - modifica atributo
+:addres <rec>:<delta> - modifica recurso
+
+DADOS:
+:r <espec> - rola dados (ex: :r 2d6,1d10)
+:challenge - rola desafio
+
+MOVES:
+:move <nome> [stat] - executa move
+:vow <nome> <rank> - cria voto
+:progress <nome> <n> - marca progresso
+:fulfill <nome> - completa track
+:tracks - lista tracks
+:abandon <nome> - abandona track
+
+ORÁCULOS:
+:oracle <nome> - consulta
+
+VÍNCULOS:
+:bond - lista
+:bond add <nome> - adiciona pessoa
+:bond addplace <nome> - adiciona lugar
+:bond addcomm <nome> - adiciona comunidade
+:bond note "<nome>" "<nota>" - adiciona nota (append)
+:bond remove <nome> - remove
+
+NAVEGAÇÃO:
+Tab - alterna foco scroll
+↑↓ - rola viewport focado
+PgUp/PgDn - rola em páginas
+ESC/Ctrl+C - sair
+
+TÓPICOS: moves, progress, oracle, chaining, character

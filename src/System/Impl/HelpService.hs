@@ -42,4 +42,3 @@ parseTopic t = case T.toLower t of
   "chaining" -> Just Help.Chaining
   "character" -> Just Help.Character
   _ -> Nothing
-

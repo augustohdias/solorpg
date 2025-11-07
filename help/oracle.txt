@@ -1,0 +1,30 @@
+ORÁCULOS
+
+CONSULTAR: :oracle <nome>
+Rola automaticamente resultado.
+
+EXEMPLOS:
+:oracle Região
+:oracle Ação
+:oracle Tema
+
+COM TEXTO: :oracle <nome> <texto>
+Consulta contextualizada.
+
+ORÁCULOS DISPONÍVEIS:
+Região - nomes de locais
+Ação - ações de NPCs/eventos
+Tema - temas narrativos
+HumanNames - nomes de personagens
+PayThePrice - consequências
+EndureHarm - resiste dano
+EndureStress - resiste estresse
+
+FUNCIONAMENTO:
+Tabela numerada, rola dados (1d100), resultado corresponde à entrada.
+Alguns têm consequências automáticas.
+
+DICAS:
+Use quando preso ou precisar inspiração.
+Combine múltiplos oráculos.
+Interprete criativamente.

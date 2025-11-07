@@ -1,0 +1,32 @@
+{
+  "oracleName": "Descritor de Personagem",
+  "oracleDescription": "Descritores para personagens NPCs (Oráculo 12)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 4], "entryText": "Desconfiado"},
+    {"entryRange": [5, 8], "entryText": "Desdenhoso"},
+    {"entryRange": [9, 12], "entryText": "Reservado"},
+    {"entryRange": [13, 16], "entryText": "Arrogante"},
+    {"entryRange": [17, 20], "entryText": "Extravagante"},
+    {"entryRange": [21, 24], "entryText": "Quieto"},
+    {"entryRange": [25, 28], "entryText": "Honesto"},
+    {"entryRange": [29, 32], "entryText": "Trabalhador"},
+    {"entryRange": [33, 36], "entryText": "Desconfiado"},
+    {"entryRange": [37, 40], "entryText": "Amigável"},
+    {"entryRange": [41, 44], "entryText": "Esperto"},
+    {"entryRange": [45, 48], "entryText": "Corajoso"},
+    {"entryRange": [49, 52], "entryText": "Cruel"},
+    {"entryRange": [53, 56], "entryText": "Excêntrico"},
+    {"entryRange": [57, 60], "entryText": "Alegre"},
+    {"entryRange": [61, 64], "entryText": "Generoso"},
+    {"entryRange": [65, 68], "entryText": "Determinado"},
+    {"entryRange": [69, 72], "entryText": "Sério"},
+    {"entryRange": [73, 76], "entryText": "Severo"},
+    {"entryRange": [77, 80], "entryText": "Desesperado"},
+    {"entryRange": [81, 84], "entryText": "Gentil"},
+    {"entryRange": [85, 88], "entryText": "Teimoso"},
+    {"entryRange": [89, 92], "entryText": "Cauteloso"},
+    {"entryRange": [93, 96], "entryText": "Selvagem"},
+    {"entryRange": [97, 100], "entryText": "Amargurado"}
+  ]
+}

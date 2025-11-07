@@ -1,0 +1,17 @@
+{
+  "oracleName": "Ação de Combate",
+  "oracleDescription": "Ações de combate de inimigos (Oráculo 16)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 10], "entryText": "Forçar rendição"},
+    {"entryRange": [11, 20], "entryText": "Coordenar com aliados"},
+    {"entryRange": [21, 30], "entryText": "Reunir reforços"},
+    {"entryRange": [31, 40], "entryText": "Se apoderar de algo ou alguém"},
+    {"entryRange": [41, 50], "entryText": "Provocar resposta imprudente"},
+    {"entryRange": [51, 60], "entryText": "Intimidar com ameaças"},
+    {"entryRange": [61, 70], "entryText": "Atrair para armadilha"},
+    {"entryRange": [71, 80], "entryText": "Atacar com precisão"},
+    {"entryRange": [81, 90], "entryText": "Atacar com força esmagadora"},
+    {"entryRange": [91, 100], "entryText": "Tomar ação defensiva"}
+  ]
+}

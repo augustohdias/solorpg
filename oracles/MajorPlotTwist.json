@@ -1,0 +1,27 @@
+{
+  "oracleName": "Reviravolta Principal",
+  "oracleDescription": "Grandes reviravoltas narrativas (Oráculo 18)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 5], "entryText": "Tudo era uma distração"},
+    {"entryRange": [6, 10], "entryText": "Um segredo sombrio é revelado"},
+    {"entryRange": [11, 15], "entryText": "Uma identidade verdadeira é exposta"},
+    {"entryRange": [16, 20], "entryText": "Uma suposição é desafiada"},
+    {"entryRange": [21, 25], "entryText": "Uma verdade oculta é revelada"},
+    {"entryRange": [26, 30], "entryText": "Um plano dá terrivelmente errado"},
+    {"entryRange": [31, 35], "entryText": "Um novo inimigo aparece"},
+    {"entryRange": [36, 40], "entryText": "Alguém foi traído"},
+    {"entryRange": [41, 45], "entryText": "Uma fraqueza é revelada"},
+    {"entryRange": [46, 50], "entryText": "Uma força se torna fraqueza"},
+    {"entryRange": [51, 55], "entryText": "Um novo aliado aparece"},
+    {"entryRange": [56, 60], "entryText": "Um objeto importante é destruído"},
+    {"entryRange": [61, 65], "entryText": "Um objetivo é alcançado a um grande custo"},
+    {"entryRange": [66, 70], "entryText": "Um relacionamento é testado"},
+    {"entryRange": [71, 75], "entryText": "Dois inimigos se tornam aliados"},
+    {"entryRange": [76, 80], "entryText": "Um inimigo poderoso é revelado"},
+    {"entryRange": [81, 85], "entryText": "Alguém retorna inesperadamente"},
+    {"entryRange": [86, 90], "entryText": "Um plano tem sucesso além das expectativas"},
+    {"entryRange": [91, 95], "entryText": "Um novo caminho à frente é revelado"},
+    {"entryRange": [96, 100], "entryText": "O verdadeiro inimigo é revelado"}
+  ]
+}

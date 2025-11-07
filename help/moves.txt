@@ -1,0 +1,33 @@
+MOVES - IRONSWORN
+
+USO: :move <nome> [stat]
+Stat opcional, sistema detecta automaticamente.
+
+EXEMPLOS:
+:move Face Danger edge
+:move Gather Information wits
+:move Strike
+
+CATEGORIAS:
+
+ADVENTURE:
+Face Danger, Gather Information, Secure Advantage, Heal, Resupply, Make Camp
+
+COMBAT:
+Enter the Fray, Strike, Clash, Turn the Tide, End the Fight
+
+QUEST:
+Swear Vow, Fulfill Vow, Reach Milestone, Forsake Vow
+
+SUFFER:
+Endure Harm, Face Death, Endure Stress, Face Desolation
+
+FATE:
+Pay the Price, Ask the Oracle
+
+RESULTADOS:
+Strong Hit - sucesso completo
+Weak Hit - sucesso parcial
+Miss - falha, consequências
+
+Consequências automáticas podem ser aplicadas.

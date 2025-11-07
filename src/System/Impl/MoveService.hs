@@ -63,7 +63,7 @@ executeMoveWithRollImpl _diceH moveType maybeStat actionDie (ch1, ch2) attrs _re
         "Action Die: " ++ show actionDie ++ " + " ++ show totalModifier ++ " = " ++ show actionTotal ++ "\n" ++
         "Challenge Dice: " ++ show ch1 ++ ", " ++ show ch2 ++ "\n" ++
         "Resultado: " ++ showRollResult rollResult ++
-        (if isMatch then "\n⚠ MATCH detectado!" else "")
+        (if isMatch then "\n[!] MATCH detectado!" else "")
   
   return $ rollInfo : consequences
 
@@ -85,9 +85,9 @@ evaluateRoll action ch1 ch2
 
 -- | Formata resultado
 showRollResult :: RollResult -> String
-showRollResult StrongHit = "STRONG HIT ✓"
-showRollResult WeakHit = "WEAK HIT ~"
-showRollResult Miss = "MISS ✗"
+showRollResult StrongHit = "[+] STRONG HIT"
+showRollResult WeakHit = "[~] WEAK HIT"
+showRollResult Miss = "[X] MISS"
 showRollResult InvalidRoll = "INVALID"
 
 -- | Retorna consequências de um move baseado no resultado
@@ -440,7 +440,7 @@ getSojournConsequences result = case result of
 -- | Forge a Bond - Crie vínculo (roll +heart)
 getForgeABondConsequences :: RollResult -> [Consequence]
 getForgeABondConsequences result = case result of
-  StrongHit -> [Narrative "Vínculo formado. Marque bond progress."]
+  StrongHit -> [Narrative "Vínculo formado.", MarkBondProgress]
   WeakHit -> [Narrative "Eles pedem mais de você. Faça ou jure voto."]
   Miss -> [TriggerMove PayThePrice, Narrative "Você não consegue o vínculo."]
   InvalidRoll -> [Narrative "Rolagem inválida."]

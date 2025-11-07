@@ -1,5 +1,5 @@
 {
-  "oracleName": "Endure Harm",
+  "oracleName": "Resistir Dano",
   "oracleDescription": "Tabela de consequências quando health = 0 em Endure Harm Miss",
   "oracleDice": "1d100",
   "oracleEntries": [

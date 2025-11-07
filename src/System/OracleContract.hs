@@ -1,4 +1,6 @@
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE OverloadedStrings #-}
 {- | OracleContract - Sistema de Oráculos customizáveis do Ironsworn
      
      Oráculos são tabelas de consulta aleatória para geração procedural.
@@ -20,7 +22,7 @@ module System.OracleContract
 
 import qualified Data.Text as T
 import GHC.Generics (Generic)
-import Data.Aeson (ToJSON, FromJSON)
+import Data.Aeson (ToJSON, FromJSON, parseJSON, (.:), (.:?), (.!=), withObject)
 import System.ConsequenceContract (Consequence(..))
 
 -- | Entrada de oráculo (linha da tabela)
@@ -29,10 +31,13 @@ data OracleEntry = OracleEntry
   , entryText :: !T.Text                -- ^ Texto do resultado
   , entryConsequence :: !(Maybe T.Text) -- ^ Consequência executável opcional (backward compatibility)
   , entryConsequences :: ![Consequence] -- ^ Consequências estruturadas
-  } deriving (Eq, Show, Generic)
-
-instance ToJSON OracleEntry
-instance FromJSON OracleEntry
+  } deriving (Eq, Show, Generic, ToJSON)
+instance FromJSON OracleEntry where
+  parseJSON = withObject "OracleEntry" $ \v -> OracleEntry
+    <$> v .: "entryRange"
+    <*> v .: "entryText"
+    <*> v .:? "entryConsequence" .!= Nothing
+    <*> v .:? "entryConsequences" .!= []
 
 -- | Tabela de oráculo
 data Oracle = Oracle

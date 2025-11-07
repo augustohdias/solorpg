@@ -1,0 +1,18 @@
+{
+  "oracleName": "Local Costeiro",
+  "oracleDescription": "Locais em águas costeiras (Oráculo 5)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 10], "entryText": "Ilha"},
+    {"entryRange": [11, 20], "entryText": "Porto"},
+    {"entryRange": [21, 30], "entryText": "Costa"},
+    {"entryRange": [31, 40], "entryText": "Baía"},
+    {"entryRange": [41, 50], "entryText": "Cabo"},
+    {"entryRange": [51, 60], "entryText": "Enseada"},
+    {"entryRange": [61, 70], "entryText": "Recife"},
+    {"entryRange": [71, 80], "entryText": "Canal"},
+    {"entryRange": [81, 90], "entryText": "Estuário"},
+    {"entryRange": [91, 100], "entryText": "Outro"}
+  ]
+}
+

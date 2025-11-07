@@ -1,0 +1,18 @@
+{
+  "oracleName": "Outros Nomes",
+  "oracleDescription": "Nomes de outras raças (Oráculo 15)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 10], "entryText": "Varou"},
+    {"entryRange": [11, 20], "entryText": "Thrond"},
+    {"entryRange": [21, 30], "entryText": "Keth"},
+    {"entryRange": [31, 40], "entryText": "Avar"},
+    {"entryRange": [41, 50], "entryText": "Neth"},
+    {"entryRange": [51, 60], "entryText": "Thrond"},
+    {"entryRange": [61, 70], "entryText": "Keth"},
+    {"entryRange": [71, 80], "entryText": "Varou"},
+    {"entryRange": [81, 90], "entryText": "Avar"},
+    {"entryRange": [91, 100], "entryText": "Neth"}
+  ]
+}
+

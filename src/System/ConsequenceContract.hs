@@ -86,6 +86,7 @@ data Consequence
   | PlayerChoice [Choice]    -- ^ Jogador deve escolher
   | Narrative T.Text         -- ^ Apenas narrativa
   | AddBonus GameContext.ActiveBonus  -- ^ Adiciona bônus ativo
+  | MarkBondProgress         -- ^ Marca 1 tick na progress track de bonds
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 -- | Opção de escolha para o jogador

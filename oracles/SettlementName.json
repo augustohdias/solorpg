@@ -1,0 +1,18 @@
+{
+  "oracleName": "Nome de Assentamento",
+  "oracleDescription": "Gerador de nomes de assentamentos (Oráculo 7)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 10], "entryText": "Highmount"},
+    {"entryRange": [11, 20], "entryText": "Brackwater"},
+    {"entryRange": [21, 30], "entryText": "Frostwood"},
+    {"entryRange": [31, 40], "entryText": "Redcrest"},
+    {"entryRange": [41, 50], "entryText": "Grimtree"},
+    {"entryRange": [51, 60], "entryText": "Stoneford"},
+    {"entryRange": [61, 70], "entryText": "Deepwater"},
+    {"entryRange": [71, 80], "entryText": "Whitefall"},
+    {"entryRange": [81, 90], "entryText": "Graycliff"},
+    {"entryRange": [91, 100], "entryText": "Three Rivers"}
+  ]
+}
+

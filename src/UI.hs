@@ -7,6 +7,7 @@ import Brick.BChan (newBChan, writeBChan)
 import Brick.Widgets.Border
 import Brick.Widgets.Center (hCenter, vCenter)
 import qualified Brick.Widgets.Edit as Ed
+import qualified Brick.Focus as F
 import qualified Graphics.Vty as Vty
 import qualified Data.Text as T
 import qualified Data.Vector as Vec
@@ -19,9 +20,10 @@ import System.Tui.Comm (GameOutput(..), MessageType(..))
 import qualified System.GameContextContract as GameContext
 import Control.Monad.IO.Class (liftIO)
 import Lens.Micro (Lens')
+import System.Console.ANSI
 
 -- Widget names
-data Name = InputField | LogViewport deriving (Eq, Ord, Show)
+data Name = InputField | LogViewport | SystemViewport deriving (Eq, Ord, Show)
 
 -- TUI State
 data TuiState = TuiState
@@ -30,6 +32,7 @@ data TuiState = TuiState
   , systemMessages :: Vec.Vector T.Text -- System notifications
   , character :: Maybe GameContext.MainCharacter
   , inputChan :: TChan T.Text -- Channel to send commands to the game loop
+  , viewportFocus :: F.FocusRing Name -- Focus ring for viewport scrolling
   }
 
 -- Brick App definition
@@ -51,6 +54,7 @@ runTui inputChan' outputChan = do
         , systemMessages = Vec.empty
         , character = Nothing
         , inputChan = inputChan'
+        , viewportFocus = F.focusRing [LogViewport, SystemViewport] -- Start with LogViewport focused
         }
   
   eventChan <- newBChan 10
@@ -74,35 +78,54 @@ runTui inputChan' outputChan = do
     atomically $ writeTChan inputChan' ":char"
 
   -- Run the TUI with custom event channel
-  void $ fst <$> customMainWithDefaultVty (Just eventChan) app initialState
+  _ <- customMainWithDefaultVty (Just eventChan) app initialState
+  
+  -- Clear screen and restore cursor position after TUI exits (vim-like behavior)
+  clearScreen
+  setCursorPosition 0 0
+
+charSheetWidth :: Int
+charSheetWidth = 40
 
 -- Main drawing function
 drawTui :: TuiState -> [Widget Name]
 drawTui ts = [ui]
   where
-    ui = vBox [ mainContent, systemPanel, inputBox ]
-    mainContent = hBox [ charSheet, logPanel ]
-    charSheet = hLimit 30 $ borderWithLabel (str " Character ") $ padAll 1 $ drawCharacter (character ts)
+    ui = vBox [ header, mainContent, inputBox ]
+    header = drawHeader (character ts) (viewportFocus ts)
+    mainContent = hBox [ charSheet, logPanel, systemPanel ]
+    charSheet = hLimit charSheetWidth $ borderWithLabel (str " Personagem ") $ padAll 1 $ drawCharacter (character ts)
     -- Log panel with word wrapping for long paragraphs
     -- Add spacing between log entries for better readability
     logPanel = withVScrollBars OnRight $ viewport LogViewport Vertical $ 
                vBox (intersperse (str " ") (map txtWrap (Vec.toList $ logs ts)))
-    -- System panel takes full width (same as inputBox)
-    systemPanel = borderWithLabel (str " System ") $ vLimit 2 $ padLeftRight 1 $ 
+    -- System panel on the right side, similar to Character block
+    systemPanel = hLimit charSheetWidth $ borderWithLabel (str " Sistema ") $ padAll 1 $
+                  withVScrollBars OnRight $ viewport SystemViewport Vertical $
                   drawSystemMessages (systemMessages ts)
     inputBox = border $ vLimit 1 $ Ed.renderEditor (txt . T.concat) True (editor ts)
 
--- Draw system messages (only show last 2 messages with word wrap)
+-- Draw header with scroll focus instruction
+drawHeader :: Maybe GameContext.MainCharacter -> F.FocusRing Name -> Widget Name
+drawHeader _ focusRing = 
+  let focusIndicator = case F.focusGetCurrent focusRing of
+        Just LogViewport -> "Log"
+        Just SystemViewport -> "Sistema"
+        _ -> "Nenhum"
+      instruction = "Aperte <Tab> para mudar o foco do scroll | Foco atual: " ++ focusIndicator
+  in hCenter $ str instruction
+
+-- Draw system messages with word wrap and spacing
 drawSystemMessages :: Vec.Vector T.Text -> Widget Name
 drawSystemMessages msgs =
-  let lastMsgs = Vec.toList $ Vec.drop (max 0 (Vec.length msgs - 2)) msgs
-  in if null lastMsgs
-     then txt " "
-     else vBox (map txtWrap lastMsgs)
+  let msgList = Vec.toList msgs
+  in if null msgList
+     then str "Nenhuma mensagem por enquanto."
+     else vBox (intersperse (str " ") (map txtWrap msgList))
 
 -- Draw character sheet
 drawCharacter :: Maybe GameContext.MainCharacter -> Widget Name
-drawCharacter Nothing = vCenter $ str "No character loaded."
+drawCharacter Nothing = vCenter $ str "Sem personagem carregado.\n\nDigite :help para ver as\nopções de comando."
 drawCharacter (Just charData) =
   vBox [ hCenter $ str $ T.unpack (GameContext.name charData)
        , hCenter $ str " "
@@ -149,18 +172,40 @@ handleEvent event = case event of
          let s' = s { editor = Ed.applyEdit clearZipper (editor s) }
          put s'
 
-  -- Handle scroll events for the log viewport
-  VtyEvent (Vty.EvKey Vty.KUp []) -> 
-    vScrollBy (viewportScroll LogViewport) (-1)
+  -- Handle Tab key to switch between viewports (using Brick's FocusRing)
+  VtyEvent (Vty.EvKey (Vty.KChar '\t') []) -> do
+    st <- get
+    put st { viewportFocus = F.focusNext (viewportFocus st) }
   
-  VtyEvent (Vty.EvKey Vty.KDown []) -> 
-    vScrollBy (viewportScroll LogViewport) 1
+  -- Handle Shift+Tab to switch backwards
+  VtyEvent (Vty.EvKey Vty.KBackTab []) -> do
+    st <- get
+    put st { viewportFocus = F.focusPrev (viewportFocus st) }
   
-  VtyEvent (Vty.EvKey Vty.KPageUp []) -> 
-    vScrollBy (viewportScroll LogViewport) (-10)
+  -- Handle scroll events for the currently focused viewport
+  VtyEvent (Vty.EvKey Vty.KUp []) -> do
+    st <- get
+    case F.focusGetCurrent (viewportFocus st) of
+      Just viewportName -> vScrollBy (viewportScroll viewportName) (-1)
+      Nothing -> return ()
   
-  VtyEvent (Vty.EvKey Vty.KPageDown []) -> 
-    vScrollBy (viewportScroll LogViewport) 10
+  VtyEvent (Vty.EvKey Vty.KDown []) -> do
+    st <- get
+    case F.focusGetCurrent (viewportFocus st) of
+      Just viewportName -> vScrollBy (viewportScroll viewportName) 1
+      Nothing -> return ()
+  
+  VtyEvent (Vty.EvKey Vty.KPageUp []) -> do
+    st <- get
+    case F.focusGetCurrent (viewportFocus st) of
+      Just viewportName -> vScrollBy (viewportScroll viewportName) (-10)
+      Nothing -> return ()
+  
+  VtyEvent (Vty.EvKey Vty.KPageDown []) -> do
+    st <- get
+    case F.focusGetCurrent (viewportFocus st) of
+      Just viewportName -> vScrollBy (viewportScroll viewportName) 10
+      Nothing -> return ()
 
   -- Handle custom game events
   AppEvent (LogEntry msg msgType) -> do
@@ -169,6 +214,8 @@ handleEvent event = case event of
       SystemMessage -> do
         let newSysMsgs = systemMessages st `Vec.snoc` msg
         put st { systemMessages = newSysMsgs }
+        -- Auto-scroll to bottom when new system message arrives
+        vScrollToEnd (viewportScroll SystemViewport)
       NarrativeMessage -> do
         let newLogs = logs st `Vec.snoc` msg
         put st { logs = newLogs }

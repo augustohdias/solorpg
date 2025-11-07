@@ -239,7 +239,7 @@ defaultConfig :: Config
 defaultConfig = Config
   { -- Arquivos
     configSessionLogFile = "session.log"
-  , configContextFileExtension = ".slg"
+  , configContextFileExtension = ".json"
 
     -- Limites
   , configMaxCharacterNameLength = 100
@@ -306,7 +306,7 @@ data CharacterDisplay = CharacterDisplay
 -- | Mensagens padrão de moves
 moveMessages :: MoveMessages
 moveMessages = MoveMessages
-  { msgVowSworn = "✓ Voto criado: "
+  { msgVowSworn = "[+] Voto criado: "
   , msgProgressMarked = "Marco alcançado! Progresso marcado."
   , msgTrackRemoved = "Track removido: "
   , msgTrackNotFound = "Track não encontrado: "
@@ -318,7 +318,7 @@ moveMessages = MoveMessages
   , msgTracksHeader = "\n=== Progress Tracks Ativos ==="
   , msgExecutingPayThePrice = "\n>>> Executando Pay the Price..."
 
-  , msgOracleResult = "🔮 Oráculo: "
+  , msgOracleResult = "[*] Oráculo: "
   , msgNoOraclesLoaded = "Nenhum oráculo carregado."
   , msgOracleNotFound = "Oráculo não encontrado: "
   , msgOracleUsage = "Uso: :oracle \"Nome do Oráculo\" [valor]\n\
@@ -330,19 +330,19 @@ moveMessages = MoveMessages
   -- Formatters
   , formatOracleRoll = \name roll text -> unlines
       [ ""
-      , "🔮 Oráculo: " ++ T.unpack name
+      , "[*] Oráculo: " ++ T.unpack name
       , "Rolagem: " ++ show roll
-      , "→ " ++ T.unpack text
+      , "-> " ++ T.unpack text
       ]
   , formatOracleIndex = \name idx text -> unlines
       [ ""
-      , "🔮 Oráculo: " ++ T.unpack name
+      , "[*] Oráculo: " ++ T.unpack name
       , "Índice: " ++ show idx
       , "Resultado: " ++ T.unpack text
       ]
   , formatVowCreated = \name rank ticks -> unlines
       [ ""
-      , "✓ Voto criado: " ++ T.unpack name ++ " (" ++ rank ++ ")"
+      , "[+] Voto criado: " ++ T.unpack name ++ " (" ++ rank ++ ")"
       , "  Progresso por mark: " ++ show ticks ++ " ticks"
       ]
   , formatProgressTrack = \name pType rank boxes ticks percentage completed ->
@@ -353,7 +353,7 @@ moveMessages = MoveMessages
       , "• " ++ T.unpack name ++ status
       , "  Tipo: " ++ pType
       , "  Rank: " ++ rank
-      , "  Progresso: " ++ show boxes ++ "/10 boxes (" ++ show ticks ++ "/40 ticks)"
+      , "  Progresso: " ++ show boxes ++ "/10 (" ++ show ticks ++ "/40)"
       , "  " ++ bar ++ " " ++ show (round percentage :: Int) ++ "%"
       ]
   , msgUndertakeJourney = "Undertake a Journey requer journey track ativo\n\
@@ -468,12 +468,12 @@ data ProgressInterpretation = ProgressInterpretation
 progressInterpretation :: ProgressInterpretation
 progressInterpretation = ProgressInterpretation
   { vowStrongHit = unlines
-      [ "✓ STRONG HIT"
+      [ "[+] STRONG HIT"
       , "Seu voto está cumprido. Marque experiência (rank do voto)."
       , "Você pode Forge a Bond (se apropriado)."
       ]
   , vowWeakHit = unlines
-      [ "~ WEAK HIT"
+      [ "[~] WEAK HIT"
       , "Seu voto está cumprido, mas há uma complicação."
       , "Marque experiência (rank -1, mínimo 1)."
       , "Escolha um:"
@@ -481,7 +481,7 @@ progressInterpretation = ProgressInterpretation
       , "  • Adicione complicação à narrativa"
       ]
   , vowMiss = unlines
-      [ "✗ MISS"
+      [ "[X] MISS"
       , "Seu voto ainda não está cumprido."
       , "Limpe todo o progresso e escolha:"
       , "  • Reafirme o voto: sofra -2 spirit"
@@ -489,32 +489,32 @@ progressInterpretation = ProgressInterpretation
       ]
 
   , combatStrongHit = unlines
-      [ "✓ STRONG HIT"
+      [ "[+] STRONG HIT"
       , "O combate termina. Você vence decisivamente."
       ]
   , combatWeakHit = unlines
-      [ "~ WEAK HIT"
+      [ "[~] WEAK HIT"
       , "O combate termina, mas escolha um:"
       , "  • Sofra harm mas vence"
       , "  • Vitória Pyrrhica (complicação narrativa)"
       ]
   , combatMiss = unlines
-      [ "✗ MISS"
+      [ "[X] MISS"
       , "Você falha em encerrar o combate."
       , "Pay the Price - situação piorou!"
       ]
 
   , journeyStrongHit = unlines
-      [ "✓ STRONG HIT"
+      [ "[+] STRONG HIT"
       , "Você completa sua jornada."
       , "+1 momentum (se tiver bonds no destino)"
       ]
   , journeyWeakHit = unlines
-      [ "~ WEAK HIT"
+      [ "[~] WEAK HIT"
       , "Você chega, mas há uma complicação ou custo."
       ]
   , journeyMiss = unlines
-      [ "✗ MISS"
+      [ "[X] MISS"
       , "Você se perde, sofre um revés, ou a situação piora."
       , "Pay the Price"
       ]
@@ -535,10 +535,10 @@ data ChallengeInterpretation = ChallengeInterpretation
 challengeInterpretation :: ChallengeInterpretation
 challengeInterpretation = ChallengeInterpretation
   { challengeHeader = "\n=== Action Roll ==="
-  , challengeStrongHit = "✓ SUCESSO TOTAL! Você consegue o que quer."
-  , challengeWeakHit = "~ SUCESSO PARCIAL. Você consegue, mas há um custo."
-  , challengeMiss = "✗ FALHA. As coisas pioram."
-  , challengeMatch = "\n⚠ MATCH! Algo inesperado acontece!"
+  , challengeStrongHit = "[+] SUCESSO TOTAL! Você consegue o que quer."
+  , challengeWeakHit = "[~] SUCESSO PARCIAL. Você consegue, mas há um custo."
+  , challengeMiss = "[X] FALHA. As coisas pioram."
+  , challengeMatch = "\n[!] MATCH! Algo inesperado acontece!"
   , challengeExpects3Dice = "Erro: :challenge espera exatamente 3 dados (1d6,2d10)"
   }
 

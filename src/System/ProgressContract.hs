@@ -6,6 +6,7 @@
      - Vows (juramentos/missões)
      - Combat (combate)
      - Journeys (jornadas)
+     - Bonds (vínculos)
      
      Baseado nas regras oficiais do Ironsworn Rulebook.
      
@@ -21,6 +22,8 @@ module System.ProgressContract
   , ChallengeRank (..)
   , ProgressType (..)
   , ProgressRollResult (..)
+  , ProgressCompletionResult (..)
+  , ProgressRollExecutionResult (..)
   
     -- * Derived functions
   , newProgressTrack
@@ -48,6 +51,7 @@ data ProgressType
   = Vow          -- ^ Juramento/missão
   | Combat       -- ^ Combate
   | Journey      -- ^ Jornada
+  | Bond         -- ^ Vínculos (bonds)
   deriving (Eq, Show, Read, Generic, ToJSON, FromJSON)
 
 -- | Progress Track
@@ -68,6 +72,23 @@ data ProgressRollResult = ProgressRollResult
   , progressMatch :: Bool                   -- ^ Se houve match
   } deriving (Eq, Show)
 
+-- | Resultado de completar um progress roll com experiência
+data ProgressCompletionResult = ProgressCompletionResult
+  { completionTrack :: ProgressTrack
+  , experienceGained :: Int
+  , completionMessage :: T.Text
+  } deriving (Show)
+
+-- | Resultado completo da execução de um progress roll
+-- Contém todas as informações necessárias para o ActionService decidir
+-- o que enviar para a TUI e como atualizar o contexto
+data ProgressRollExecutionResult = ProgressRollExecutionResult
+  { executionNarrativeMessage :: T.Text      -- ^ Mensagem formatada para log narrativo
+  , executionUpdatedTrack :: ProgressTrack   -- ^ Track após processamento completo
+  , executionExperienceGained :: Int         -- ^ Experiência ganha (0 se nenhuma)
+  , executionSystemMessage :: Maybe T.Text  -- ^ Mensagem de sistema (se houver)
+  } deriving (Show)
+
 -- | Handle abstrato para o serviço de Progress
 data Handle = Handle
   { -- | Marca progresso em um track
@@ -75,6 +96,9 @@ data Handle = Handle
     
     -- | Faz progress roll (rola 2d10 vs progress score)
   , rollProgress :: !(ProgressTrack -> IO ProgressRollResult)
+  
+    -- | Completa track e calcula experiência baseado no resultado
+  , completeProgressRoll :: !(ProgressTrack -> ProgressRollResult -> IO ProgressCompletionResult)
   
     -- | Marca progresso customizado (quantidade específica de ticks)
   , markProgressTicks :: !(ProgressTrack -> Int -> IO ProgressTrack)
@@ -84,6 +108,10 @@ data Handle = Handle
   
     -- | Limpa um track (remove progresso)
   , clearTrack :: !(ProgressTrack -> IO ProgressTrack)
+  
+    -- | Executa progress roll completo e retorna resultado formatado
+    -- Realiza roll, formata mensagens e processa conclusão em uma única operação
+  , executeProgressRoll :: !(ProgressTrack -> IO ProgressRollExecutionResult)
   }
 
 -- | Cria novo progress track

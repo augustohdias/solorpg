@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {- | Implementação do serviço GameContext usando armazenamento em JSON.
      
-     Esta implementação salva os contextos em arquivos .slg no formato JSON,
+     Esta implementação salva os contextos em arquivos .json no formato JSON,
      permitindo fácil leitura e modificação manual se necessário.
 -}
 module System.Impl.GameContextService (newHandle) where
@@ -26,7 +26,7 @@ newtype InternalHandle = InternalHandle
 -- | Safe wrapper for modifyMVar that handles exceptions
 -- Prevents deadlock if an exception occurs during modification
 safeModifyMVar :: MVar a -> (a -> IO (a, b)) -> IO (Either SomeException b)
-safeModifyMVar mvar f = 
+safeModifyMVar mvar f =
     try $ modifyMVar mvar f
 
 
@@ -35,7 +35,7 @@ newHandle :: IO GameContext.Handle
 newHandle = do
     contextVar <- newMVar Nothing
     let iHandle = InternalHandle { currentContext = contextVar }
-    
+
     return $ GameContext.Handle
         { GameContext.createContext = createContextImpl iHandle
         , GameContext.loadContext = loadContextImpl iHandle
@@ -60,6 +60,7 @@ newHandle = do
         , GameContext.removeBond = removeBondImpl iHandle
         , GameContext.hasBond = hasBondImpl
         , GameContext.listBonds = listBondsImpl
+        , GameContext.updateBond = updateBondImpl iHandle
         , GameContext.deleteContext = deleteContextImpl
         }
 
@@ -77,7 +78,7 @@ createContextImpl iHandle charName attrs = do
         else do
             let fileName = getContextFileName charName
             exists <- doesFileExist fileName
-            
+
             if exists
                 then return $ Left GameContext.CharacterAlreadyExists
                 else do
@@ -90,13 +91,13 @@ createContextImpl iHandle charName attrs = do
                             , GameContext.momentum = C.configDefaultResourceMomentum cfg
                             , GameContext.experience = C.configDefaultResourceExperience cfg
                             }
-                    
+
                     let character = GameContext.MainCharacter
                             { GameContext.name = charName
                             , GameContext.attributes = attrs
                             , GameContext.resources = defaultResources
                             }
-                    
+
                     let context = GameContext.Context
                             { GameContext.mainCharacter = character
                             , GameContext.world = GameContext.World []
@@ -105,7 +106,7 @@ createContextImpl iHandle charName attrs = do
                             , GameContext.activeBonuses = []
                             , GameContext.bonds = []
                             }
-                    
+
                     -- Salva contexto inicial
                     saveResult <- saveContextImpl context
                     case saveResult of
@@ -120,7 +121,7 @@ loadContextImpl :: InternalHandle -> T.Text -> IO (Either GameContext.ContextErr
 loadContextImpl iHandle charName = do
     let fileName = getContextFileName charName
     exists <- doesFileExist fileName
-    
+
     if not exists
         then return $ Left (GameContext.FileError $ "Arquivo não encontrado: " ++ fileName)
         else do
@@ -133,7 +134,7 @@ loadContextImpl iHandle charName = do
                         Nothing -> return $ Left (GameContext.ParseError "Erro ao parsear JSON")
                         Just ctx -> do
                             -- Atualiza contexto atual (thread-safe)
-                            modifyResult <- safeModifyMVar (currentContext iHandle) $ \_ -> 
+                            modifyResult <- safeModifyMVar (currentContext iHandle) $ \_ ->
                                 return (Just ctx, ())
                             case modifyResult of
                                 Left err -> return $ Left (GameContext.FileError $ "Erro ao atualizar contexto: " ++ show err)
@@ -145,7 +146,7 @@ saveContextImpl ctx = do
     let charName = GameContext.name . GameContext.mainCharacter $ ctx
     let fileName = getContextFileName charName
     let jsonContent = encode ctx
-    
+
     -- Use safe file write to prevent concurrent writes
     result <- SafeIO.safeWriteFile fileName jsonContent
     case result of
@@ -162,7 +163,7 @@ updateAttributesImpl iHandle ctx newAttrs = do
     let character = GameContext.mainCharacter ctx
     let updatedCharacter = character { GameContext.attributes = newAttrs }
     let updatedCtx = ctx { GameContext.mainCharacter = updatedCharacter }
-    
+
     -- Atualiza contexto atual
     modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
@@ -173,7 +174,7 @@ updateResourcesImpl iHandle ctx newRes = do
     let character = GameContext.mainCharacter ctx
     let updatedCharacter = character { GameContext.resources = newRes }
     let updatedCtx = ctx { GameContext.mainCharacter = updatedCharacter }
-    
+
     -- Atualiza contexto atual
     modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
@@ -185,7 +186,7 @@ addWorldDataImpl iHandle ctx newData = do
     let worldData = GameContext.wData world
     let updatedWorld = world { GameContext.wData = newData : worldData }
     let updatedCtx = ctx { GameContext.world = updatedWorld }
-    
+
     -- Atualiza contexto atual
     modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
@@ -199,7 +200,7 @@ addLogEntryImpl iHandle ctx logEntry = do
     let timestampedEntry = C.formatLogEntry C.gameConstants timeStr logEntry
     let currentLog = GameContext.sessionLog ctx
     let updatedCtx = ctx { GameContext.sessionLog = timestampedEntry : currentLog }
-    
+
     -- Atualiza contexto atual
     modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
@@ -212,29 +213,35 @@ getSessionLogImpl = GameContext.sessionLog
 clearSessionLogImpl :: InternalHandle -> GameContext.Context -> IO GameContext.Context
 clearSessionLogImpl iHandle ctx = do
     let updatedCtx = ctx { GameContext.sessionLog = [] }
-    
+
     -- Atualiza contexto atual
     modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
 
 -- | Adiciona progress track ao contexto
 addProgressTrackImpl :: InternalHandle -> GameContext.Context -> Progress.ProgressTrack -> IO GameContext.Context
-addProgressTrackImpl iHandle ctx track = do
-    let tracks = GameContext.progressTracks ctx
-    let updatedCtx = ctx { GameContext.progressTracks = track : tracks }
-    
-    modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
-    return updatedCtx
+addProgressTrackImpl iHandle _ctx track = do
+    -- Use modifyMVar atomically to read current context and update it
+    modifyMVar (currentContext iHandle) $ \maybeCtx -> do
+        case maybeCtx of
+            Nothing -> return (Just _ctx, _ctx)  -- Fallback to passed context if MVar is empty
+            Just ctx -> do
+                let tracks = GameContext.progressTracks ctx
+                let updatedCtx = ctx { GameContext.progressTracks = track : tracks }
+                return (Just updatedCtx, updatedCtx)
 
 -- | Atualiza progress track existente
 updateProgressTrackImpl :: InternalHandle -> GameContext.Context -> T.Text -> Progress.ProgressTrack -> IO GameContext.Context
-updateProgressTrackImpl iHandle ctx trackName updatedTrack = do
-    let tracks = GameContext.progressTracks ctx
-    let newTracks = map (\t -> if Progress.trackName t == trackName then updatedTrack else t) tracks
-    let updatedCtx = ctx { GameContext.progressTracks = newTracks }
-    
-    modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
-    return updatedCtx
+updateProgressTrackImpl iHandle _ctx trackName updatedTrack = do
+    -- Use modifyMVar atomically to read current context and update it
+    modifyMVar (currentContext iHandle) $ \maybeCtx -> do
+        case maybeCtx of
+            Nothing -> return (Just _ctx, _ctx)  -- Fallback to passed context if MVar is empty
+            Just ctx -> do
+                let tracks = GameContext.progressTracks ctx
+                let newTracks = map (\t -> if Progress.trackName t == trackName then updatedTrack else t) tracks
+                let updatedCtx = ctx { GameContext.progressTracks = newTracks }
+                return (Just updatedCtx, updatedCtx)
 
 -- | Obtém progress track por nome
 getProgressTrackImpl :: GameContext.Context -> T.Text -> Maybe Progress.ProgressTrack
@@ -253,7 +260,7 @@ removeProgressTrackImpl iHandle ctx trackName = do
     let tracks = GameContext.progressTracks ctx
     let newTracks = filter (\t -> Progress.trackName t /= trackName) tracks
     let updatedCtx = ctx { GameContext.progressTracks = newTracks }
-    
+
     modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
 
@@ -262,7 +269,7 @@ addBonusImpl :: InternalHandle -> GameContext.Context -> GameContext.ActiveBonus
 addBonusImpl iHandle ctx bonus = do
     let bonuses = GameContext.activeBonuses ctx
     let updatedCtx = ctx { GameContext.activeBonuses = bonus : bonuses }
-    
+
     modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
 
@@ -272,7 +279,7 @@ removeBonusImpl iHandle ctx bonus = do
     let bonuses = GameContext.activeBonuses ctx
     let newBonuses = filter (/= bonus) bonuses
     let updatedCtx = ctx { GameContext.activeBonuses = newBonuses }
-    
+
     modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
 
@@ -285,7 +292,7 @@ getApplicableBonusesImpl ctx maybeMoveName =
     isBonusApplicable :: Maybe T.Text -> GameContext.ActiveBonus -> Bool
     isBonusApplicable _ bonus | GameContext.bonusType bonus == GameContext.Persistent = True
     isBonusApplicable _ bonus | GameContext.bonusType bonus == GameContext.NextRoll = True
-    isBonusApplicable (Just moveName) bonus = 
+    isBonusApplicable (Just moveName) bonus =
       case GameContext.bonusType bonus of
         GameContext.NextMove targetMove -> moveName == targetMove
         _ -> False
@@ -296,17 +303,17 @@ consumeBonusesImpl :: InternalHandle -> GameContext.Context -> Maybe T.Text -> I
 consumeBonusesImpl iHandle ctx maybeMoveName = do
     let bonuses = GameContext.activeBonuses ctx
     let (toConsume, toKeep) = partition (shouldConsume maybeMoveName) bonuses
-    
+
     -- Mostra bônus consumidos
     mapM_ (\b -> putStrLn $ "  [Bônus consumido: " ++ T.unpack (GameContext.bonusDescription b) ++ " +" ++ show (GameContext.bonusValue b) ++ "]") toConsume
-    
+
     let updatedCtx = ctx { GameContext.activeBonuses = toKeep }
     modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
   where
     shouldConsume :: Maybe T.Text -> GameContext.ActiveBonus -> Bool
     shouldConsume _ bonus | GameContext.bonusType bonus == GameContext.NextRoll = True
-    shouldConsume (Just moveName) bonus = 
+    shouldConsume (Just moveName) bonus =
       case GameContext.bonusType bonus of
         GameContext.NextMove targetMove -> moveName == targetMove
         _ -> False
@@ -321,20 +328,28 @@ clearBonusesImpl iHandle ctx = do
 
 -- | Adiciona bond
 addBondImpl :: InternalHandle -> GameContext.Context -> GameContext.Bond -> IO GameContext.Context
-addBondImpl iHandle ctx bond = do
-    let bonds = GameContext.bonds ctx
-    let updatedCtx = ctx { GameContext.bonds = bond : bonds }
-    modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
-    return updatedCtx
+addBondImpl iHandle _ctx bond = do
+    -- Use modifyMVar atomically to read current context and update it
+    modifyMVar (currentContext iHandle) $ \maybeCtx -> do
+        case maybeCtx of
+            Nothing -> return (Just _ctx, _ctx)  -- Fallback to passed context if MVar is empty
+            Just ctx -> do
+                let bonds = GameContext.bonds ctx
+                let updatedCtx = ctx { GameContext.bonds = bond : bonds }
+                return (Just updatedCtx, updatedCtx)
 
 -- | Remove bond por nome
 removeBondImpl :: InternalHandle -> GameContext.Context -> T.Text -> IO GameContext.Context
-removeBondImpl iHandle ctx bondName = do
-    let bonds = GameContext.bonds ctx
-    let newBonds = filter (\b -> GameContext.bondName b /= bondName) bonds
-    let updatedCtx = ctx { GameContext.bonds = newBonds }
-    modifyMVar (currentContext iHandle) $ \_ -> return (Just updatedCtx, ())
-    return updatedCtx
+removeBondImpl iHandle _ctx bondName = do
+    -- Use modifyMVar atomically to read current context and update it
+    modifyMVar (currentContext iHandle) $ \maybeCtx -> do
+        case maybeCtx of
+            Nothing -> return (Just _ctx, _ctx)  -- Fallback to passed context if MVar is empty
+            Just ctx -> do
+                let bonds = GameContext.bonds ctx
+                let newBonds = filter (\b -> GameContext.bondName b /= bondName) bonds
+                let updatedCtx = ctx { GameContext.bonds = newBonds }
+                return (Just updatedCtx, updatedCtx)
 
 -- | Verifica se tem bond com nome
 hasBondImpl :: GameContext.Context -> T.Text -> Bool
@@ -345,12 +360,25 @@ hasBondImpl ctx bondName =
 listBondsImpl :: GameContext.Context -> [GameContext.Bond]
 listBondsImpl = GameContext.bonds
 
+-- | Atualiza bond existente por nome
+updateBondImpl :: InternalHandle -> GameContext.Context -> T.Text -> GameContext.Bond -> IO GameContext.Context
+updateBondImpl iHandle _ctx bondName updatedBond = do
+    -- Use modifyMVar atomically to read current context and update it
+    modifyMVar (currentContext iHandle) $ \maybeCtx -> do
+        case maybeCtx of
+            Nothing -> return (Just _ctx, _ctx)  -- Fallback to passed context if MVar is empty
+            Just ctx -> do
+                let bonds = GameContext.bonds ctx
+                let newBonds = map (\b -> if GameContext.bondName b == bondName then updatedBond else b) bonds
+                let updatedCtx = ctx { GameContext.bonds = newBonds }
+                return (Just updatedCtx, updatedCtx)
+
 -- | Remove arquivo de contexto
 deleteContextImpl :: T.Text -> IO (Either GameContext.ContextError ())
 deleteContextImpl charName = do
     let fileName = getContextFileName charName
     exists <- doesFileExist fileName
-    
+
     if not exists
         then return $ Left (GameContext.FileError $ "Arquivo não encontrado: " ++ fileName)
         else do

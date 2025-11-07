@@ -1,0 +1,27 @@
+{
+  "oracleName": "Problema de Assentamento",
+  "oracleDescription": "Problemas que afligem assentamentos (Oráculo 9)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 5], "entryText": "Forasteiros rejeitados"},
+    {"entryRange": [6, 10], "entryText": "Descoberta perigosa"},
+    {"entryRange": [11, 15], "entryText": "Presságios terríveis"},
+    {"entryRange": [16, 20], "entryText": "Desastre natural"},
+    {"entryRange": [21, 25], "entryText": "Feridas antigas reabertas"},
+    {"entryRange": [26, 30], "entryText": "Objeto importante perdido"},
+    {"entryRange": [31, 35], "entryText": "Alguém foi capturado"},
+    {"entryRange": [36, 40], "entryText": "Fenômeno misterioso"},
+    {"entryRange": [41, 45], "entryText": "Revolta contra um líder"},
+    {"entryRange": [46, 50], "entryText": "Pária vingativo"},
+    {"entryRange": [51, 55], "entryText": "Assentamento rival"},
+    {"entryRange": [56, 60], "entryText": "A natureza revida"},
+    {"entryRange": [61, 65], "entryText": "Alguém está desaparecido"},
+    {"entryRange": [66, 70], "entryText": "Produção interrompida"},
+    {"entryRange": [71, 75], "entryText": "Assassinatos misteriosos"},
+    {"entryRange": [76, 80], "entryText": "Tirano cruel"},
+    {"entryRange": [81, 85], "entryText": "Os mortos caminham"},
+    {"entryRange": [86, 90], "entryText": "Nascimento de um salvador"},
+    {"entryRange": [91, 95], "entryText": "Monstro predador"},
+    {"entryRange": [96, 100], "entryText": "Tradição antiga"}
+  ]
+}

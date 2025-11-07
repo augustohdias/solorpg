@@ -1,0 +1,12 @@
+{
+  "oracleName": "Nível de Desafio",
+  "oracleDescription": "Níveis de dificuldade de desafios (Oráculo 19)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 30], "entryText": "Problemático"},
+    {"entryRange": [31, 60], "entryText": "Perigoso"},
+    {"entryRange": [61, 80], "entryText": "Formidável"},
+    {"entryRange": [81, 95], "entryText": "Extremo"},
+    {"entryRange": [96, 100], "entryText": "Épico"}
+  ]
+}

@@ -38,6 +38,7 @@ dependencies:
 - microlens
 - microlens-mtl
 - async
+- ansi-terminal
 
 ghc-options:
 - -Wall

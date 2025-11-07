@@ -1,0 +1,28 @@
+PROGRESS TRACKS
+
+CRIAR: :vow <nome> <rank>
+Ranks: troublesome(2), dangerous(4), formidable(6), extreme(8), epic(10)
+
+EXEMPLOS:
+:vow "Avenge father" dangerous
+:vow "Find artifact" formidable
+
+MARCAR: :progress <nome> <n>
+Progresso acumulativo.
+
+COMPLETAR: :fulfill <nome>
+Progress Roll para completar objetivo.
+
+RESULTADOS:
+Strong Hit - completo! Ganha XP
+Weak Hit - completo com complicação
+Miss - falha, pode tentar novamente
+
+XP POR RANK:
+Troublesome: 1, Dangerous: 2, Formidable: 3, Extreme: 4, Epic: 5
+
+GERENCIAR:
+:tracks - lista tracks ativos
+:abandon <nome> - abandona (sem XP)
+
+TIPOS: Vows, Combat Tracks, Journey Tracks

@@ -1,0 +1,18 @@
+{
+  "oracleName": "Gerador de Nomes",
+  "oracleDescription": "Gerador rápido de nomes de assentamentos combinando elementos (Oráculo 8)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 10], "entryText": "High"},
+    {"entryRange": [11, 20], "entryText": "Brack"},
+    {"entryRange": [21, 30], "entryText": "Frost"},
+    {"entryRange": [31, 40], "entryText": "Red"},
+    {"entryRange": [41, 50], "entryText": "Grim"},
+    {"entryRange": [51, 60], "entryText": "Stone"},
+    {"entryRange": [61, 70], "entryText": "Deep"},
+    {"entryRange": [71, 80], "entryText": "White"},
+    {"entryRange": [81, 90], "entryText": "Gray"},
+    {"entryRange": [91, 100], "entryText": "Three"}
+  ]
+}
+

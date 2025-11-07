@@ -10,25 +10,82 @@ module System.Util.Parser
   , parseAttributeUpdate
   , parseAttributeAdd
   
-    -- * Parsing de recursos
+  -- * Parsing de recursos
   , parseResourceUpdate
   , parseResourceAdd
   
-    -- * Parsing genérico
+  -- * Parsing de progress tracks
+  , parseRank
+  , rankToText
+  
+  -- * Parsing genérico
   , parseKeyValue
   , parseDecimal
   , parseSignedDecimal
   , parseQuotedString
   , parseOracleQuery
-  
-    -- * Funções auxiliares
+  , formatProgressTrack
+  , formatProgressRollResult
+  -- * Funções auxiliares
   , clamp
   ) where
 
 import qualified System.GameContextContract as GameContext
+import qualified System.ProgressContract as Progress
+import qualified System.DiceContract as Dice
 import qualified System.Constants as C
 import qualified Data.Text as T
 import qualified Data.Text.Read as TR
+
+
+formatProgressTrack :: Progress.ProgressTrack -> T.Text
+formatProgressTrack track =
+  let name = Progress.trackName track
+      pType = case Progress.trackType track of
+        Progress.Vow -> "Vow"
+        Progress.Combat -> "Combat"
+        Progress.Journey -> "Journey"
+        Progress.Bond -> "Bond"
+      rank = rankToText (Progress.trackRank track)
+      boxes = Progress.getProgressScore track
+      ticks = Progress.trackTicks track
+      percentage = Progress.progressPercentage track
+      completed = Progress.trackCompleted track
+  in T.pack $ C.formatProgressTrack C.moveMessages name pType (T.unpack rank) boxes ticks percentage completed
+
+formatProgressRollResult :: Progress.ProgressRollResult -> Progress.ProgressType -> T.Text
+formatProgressRollResult result pType =
+  let score = Progress.progressScore result
+      (ch1, ch2) = Progress.progressChallengeDice result
+      rollResult = Progress.progressRollResult result
+      hasMatch = Progress.progressMatch result
+
+      resultMsg = case rollResult of
+        Dice.StrongHit -> "[+] STRONG HIT"
+        Dice.WeakHit -> "[~] WEAK HIT"
+        Dice.Miss -> "[X] MISS"
+        Dice.InvalidRoll -> "INVALID"
+
+      matchMsg = if hasMatch then "\n[!] MATCH!" else ""
+
+      interpretation = case (pType, rollResult) of
+        (Progress.Vow, Dice.StrongHit) -> C.vowStrongHit C.progressInterpretation
+        (Progress.Vow, Dice.WeakHit) -> C.vowWeakHit C.progressInterpretation
+        (Progress.Vow, Dice.Miss) -> C.vowMiss C.progressInterpretation
+        (Progress.Combat, Dice.StrongHit) -> C.combatStrongHit C.progressInterpretation
+        (Progress.Combat, Dice.WeakHit) -> C.combatWeakHit C.progressInterpretation
+        (Progress.Combat, Dice.Miss) -> C.combatMiss C.progressInterpretation
+        (Progress.Journey, Dice.StrongHit) -> C.journeyStrongHit C.progressInterpretation
+        (Progress.Journey, Dice.WeakHit) -> C.journeyWeakHit C.progressInterpretation
+        (Progress.Journey, Dice.Miss) -> C.journeyMiss C.progressInterpretation
+        _ -> ""
+
+      header = "\n=== Progress Roll ===\n" <>
+               "Progress Score: " <> T.pack (show score) <> "\n" <>
+               "Challenge Dice: " <> T.pack (show ch1) <> ", " <> T.pack (show ch2) <> "\n" <>
+               "Resultado: " <> T.pack resultMsg <> matchMsg <> "\n"
+
+  in header <> T.pack interpretation
 
 -- | Parse atributos de uma lista de textos (ex: ["iron:3", "edge:2"])
 parseAttributes :: [T.Text] -> GameContext.Attributes
@@ -149,4 +206,24 @@ parseOracleQuery input =
       in if null parts
          then ("", "")
          else (head parts, T.unwords (tail parts))
+
+-- | Parse ChallengeRank de texto
+parseRank :: T.Text -> Maybe Progress.ChallengeRank
+parseRank txt = case T.toLower txt of
+  "troublesome" -> Just Progress.Troublesome
+  "dangerous" -> Just Progress.Dangerous
+  "formidable" -> Just Progress.Formidable
+  "extreme" -> Just Progress.Extreme
+  "epic" -> Just Progress.Epic
+  _ -> case reads (T.unpack txt) of
+    [(rank, "")] -> Just rank
+    _ -> Nothing
+
+-- | Converte ChallengeRank para texto
+rankToText :: Progress.ChallengeRank -> T.Text
+rankToText Progress.Troublesome = "troublesome"
+rankToText Progress.Dangerous = "dangerous"
+rankToText Progress.Formidable = "formidable"
+rankToText Progress.Extreme = "extreme"
+rankToText Progress.Epic = "epic"
 

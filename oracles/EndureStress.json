@@ -1,5 +1,5 @@
 {
-  "oracleName": "Endure Stress",
+  "oracleName": "Resistir Estresse",
   "oracleDescription": "Tabela de consequências quando spirit = 0 em Endure Stress Miss",  
   "oracleDice": "1d100",
   "oracleEntries": [

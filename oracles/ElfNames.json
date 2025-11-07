@@ -1,0 +1,28 @@
+{
+  "oracleName": "Nomes de Elfos",
+  "oracleDescription": "Nomes de elfos (Oráculo 14)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 5], "entryText": "Aelwyn"},
+    {"entryRange": [6, 10], "entryText": "Baelwyn"},
+    {"entryRange": [11, 15], "entryText": "Caelwyn"},
+    {"entryRange": [16, 20], "entryText": "Daelwyn"},
+    {"entryRange": [21, 25], "entryText": "Elaeth"},
+    {"entryRange": [26, 30], "entryText": "Faelan"},
+    {"entryRange": [31, 35], "entryText": "Gaelwyn"},
+    {"entryRange": [36, 40], "entryText": "Haelwyn"},
+    {"entryRange": [41, 45], "entryText": "Iaelwyn"},
+    {"entryRange": [46, 50], "entryText": "Jaelwyn"},
+    {"entryRange": [51, 55], "entryText": "Kaelwyn"},
+    {"entryRange": [56, 60], "entryText": "Laelwyn"},
+    {"entryRange": [61, 65], "entryText": "Maelwyn"},
+    {"entryRange": [66, 70], "entryText": "Naelwyn"},
+    {"entryRange": [71, 75], "entryText": "Oaelwyn"},
+    {"entryRange": [76, 80], "entryText": "Paelwyn"},
+    {"entryRange": [81, 85], "entryText": "Qaelwyn"},
+    {"entryRange": [86, 90], "entryText": "Raelwyn"},
+    {"entryRange": [91, 95], "entryText": "Saelwyn"},
+    {"entryRange": [96, 100], "entryText": "Taelwyn"}
+  ]
+}
+

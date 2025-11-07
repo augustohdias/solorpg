@@ -1,0 +1,22 @@
+{
+  "oracleName": "Local",
+  "oracleDescription": "Tipos de locais nas Ironlands (Oráculo 4)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 8], "entryText": "Ruína"},
+    {"entryRange": [9, 16], "entryText": "Mina"},
+    {"entryRange": [17, 24], "entryText": "Passagem"},
+    {"entryRange": [25, 32], "entryText": "Covil"},
+    {"entryRange": [33, 40], "entryText": "Refúgio"},
+    {"entryRange": [41, 48], "entryText": "Marco"},
+    {"entryRange": [49, 56], "entryText": "Assentamento"},
+    {"entryRange": [57, 64], "entryText": "Estrutura"},
+    {"entryRange": [65, 72], "entryText": "Vila"},
+    {"entryRange": [73, 80], "entryText": "Caminho"},
+    {"entryRange": [81, 85], "entryText": "Lago"},
+    {"entryRange": [86, 90], "entryText": "Árvore"},
+    {"entryRange": [91, 95], "entryText": "Acampamento"},
+    {"entryRange": [96, 100], "entryText": "Outro"}
+  ]
+}
+

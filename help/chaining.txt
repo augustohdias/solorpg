@@ -1,0 +1,26 @@
+ENCADEAMENTO
+
+Ações podem acionar outras ações automaticamente.
+
+TIPOS:
+
+CONSEQUÊNCIAS DE MOVES:
+Miss pode aplicar: modificações de recursos, entradas narrativas, triggers.
+
+CONSEQUÊNCIAS DE ORÁCULOS:
+PayThePrice - modifica recursos
+EndureHarm - reduz health
+EndureStress - reduz spirit
+Outros - adicionam narrativa
+
+TIPOS DE CONSEQUÊNCIAS:
+Narrative - adiciona ao log
+Resource - modifica recursos
+Oracle - aciona outro oráculo
+Move - aciona outro move
+
+EXEMPLO:
+Move Miss → Pay the Price → oráculo → modifica recursos → narrativa
+
+CONTROLE:
+Automático. Veja mensagens do sistema e log narrativo.

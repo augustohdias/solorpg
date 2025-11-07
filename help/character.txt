@@ -1,0 +1,43 @@
+PERSONAGENS
+
+CRIAR: :create <nome>
+CARREGAR: :load <nome>
+VER: :char
+
+ATRIBUTOS (1-5):
+Iron, Edge, Heart, Shadow, Wits
+
+DEFINIR: :setattr <attr>:<val>
+MODIFICAR: :addattr <attr>:<delta>
+
+EXEMPLOS:
+:setattr iron:3
+:addattr iron:-1
+
+RECURSOS:
+Health (0-5), Spirit (0-5), Supply (0-5), Momentum (-6 a +10), XP (0+)
+
+DEFINIR: :setres <rec>:<val>
+MODIFICAR: :addres <rec>:<delta>
+
+EXEMPLOS:
+:setres health:5
+:addres supply:-2
+
+VÍNCULOS (BONDS):
+:bond - lista todos
+:bond add <nome> - adiciona pessoa
+:bond addplace <nome> - adiciona lugar
+:bond addcomm <nome> - adiciona comunidade
+:bond note "<nome>" "<nota>" - adiciona nota (append)
+:bond remove <nome> - remove
+
+Bonds representam conexões com pessoas, comunidades e lugares.
+Podem ser usados em moves como Forge a Bond e Test Your Bond.
+
+XP:
+Ganho ao completar Vows:
+Troublesome: 1, Dangerous: 2, Formidable: 3, Extreme: 4, Epic: 5
+
+SALVAMENTO:
+Automático ao modificar atributos/recursos ou adicionar log.

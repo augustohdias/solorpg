@@ -1,0 +1,27 @@
+{
+  "oracleName": "Objetivo de Personagem",
+  "oracleDescription": "Objetivos de personagens NPCs (Oráculo 11)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 5], "entryText": "Obter um objeto"},
+    {"entryRange": [6, 10], "entryText": "Fazer um acordo"},
+    {"entryRange": [11, 15], "entryText": "Construir um relacionamento"},
+    {"entryRange": [16, 20], "entryText": "Sabotar um relacionamento"},
+    {"entryRange": [21, 25], "entryText": "Buscar uma verdade"},
+    {"entryRange": [26, 30], "entryText": "Pagar uma dívida"},
+    {"entryRange": [31, 35], "entryText": "Refutar uma falsidade"},
+    {"entryRange": [36, 40], "entryText": "Prejudicar um rival"},
+    {"entryRange": [41, 45], "entryText": "Curar uma doença"},
+    {"entryRange": [46, 50], "entryText": "Encontrar uma pessoa"},
+    {"entryRange": [51, 55], "entryText": "Encontrar um lar"},
+    {"entryRange": [56, 60], "entryText": "Se apoderar do poder"},
+    {"entryRange": [61, 65], "entryText": "Restaurar um relacionamento"},
+    {"entryRange": [66, 70], "entryText": "Criar um artefato"},
+    {"entryRange": [71, 75], "entryText": "Viajar para um lugar"},
+    {"entryRange": [76, 80], "entryText": "Garantir provisões"},
+    {"entryRange": [81, 85], "entryText": "Rebelar-se contra o poder"},
+    {"entryRange": [86, 90], "entryText": "Cobrar uma dívida"},
+    {"entryRange": [91, 95], "entryText": "Proteger um segredo"},
+    {"entryRange": [96, 100], "entryText": "Espalhar a fé"}
+  ]
+}

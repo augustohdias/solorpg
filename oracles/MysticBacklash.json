@@ -1,0 +1,27 @@
+{
+  "oracleName": "Retrocesso Místico",
+  "oracleDescription": "Efeitos colaterais de magia (Oráculo 17)",
+  "oracleDice": "1d100",
+  "oracleEntries": [
+    {"entryRange": [1, 5], "entryText": "Seu ritual tem o efeito oposto"},
+    {"entryRange": [6, 10], "entryText": "Você está esgotado ou enfraquecido"},
+    {"entryRange": [11, 15], "entryText": "Um amigo, aliado ou companheiro é afetado negativamente"},
+    {"entryRange": [16, 20], "entryText": "Você destrói algo importante para você"},
+    {"entryRange": [21, 25], "entryText": "Você inadvertidamente invoca ou cria um horror"},
+    {"entryRange": [26, 30], "entryText": "Você é atormentado por vozes ou visões"},
+    {"entryRange": [31, 35], "entryText": "Você é consumido pela dor"},
+    {"entryRange": [36, 40], "entryText": "O ambiente ao seu redor é distorcido ou deformado"},
+    {"entryRange": [41, 45], "entryText": "Um horror ou corrupção se apodera"},
+    {"entryRange": [46, 50], "entryText": "Você é separado de algo ou alguém"},
+    {"entryRange": [51, 55], "entryText": "Seu esforço é desfeito"},
+    {"entryRange": [56, 60], "entryText": "Você enfrenta uma verdade terrível"},
+    {"entryRange": [61, 65], "entryText": "Você é dominado pelo pavor"},
+    {"entryRange": [66, 70], "entryText": "Você está perdido ou à deriva"},
+    {"entryRange": [71, 75], "entryText": "Você não é você mesmo"},
+    {"entryRange": [76, 80], "entryText": "Você está marcado ou corrompido"},
+    {"entryRange": [81, 85], "entryText": "Você é exposto a um horror"},
+    {"entryRange": [86, 90], "entryText": "Você está preso ou amarrado"},
+    {"entryRange": [91, 95], "entryText": "Você é enganado ou traído"},
+    {"entryRange": [96, 100], "entryText": "Você é observado por um poder maior"}
+  ]
+}
