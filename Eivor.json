@@ -1,1 +1,72 @@
-{"activeBonuses":[],"bonds":[{"bondName":"Gisla","bondNotes":"A pessoa que me ensinou tudo que sei sobre combates de curta distância. A melhor professora que se pode querer e a pessoa mais justa que conheço. Esposa de minha irmã.","bondType":"PersonBond"},{"bondName":"Ingrid","bondNotes":"O último vestígio de família que me restou. Minha irmã de sangue que amo muito.","bondType":"PersonBond"},{"bondName":"Ragnar","bondNotes":"O último homem de confiança que restou nesta Terra. Meu bom e velho amigo de infância.","bondType":"Undefined"}],"mainCharacter":{"attributes":{"edge":2,"heart":1,"iron":3,"shadow":1,"wits":2},"name":"Eivor","resources":{"experience":0,"health":5,"momentum":-5,"spirit":5,"supply":0}},"progressTracks":[{"trackCompleted":false,"trackName":"Bonds","trackRank":"Troublesome","trackTicks":4,"trackType":"Bond"},{"trackCompleted":false,"trackName":"Restaurar a honra dos cavaleiros da Décima Terceira divisão da Barreira","trackRank":"Epic","trackTicks":0,"trackType":"Vow"}],"sessionLog":["[*] Oráculo: Default (Rolou 6):\n-> Opção B","Use :oracle \"Nome\" para consultar oráculos.","\n>>> AskTheOracle <<<\nAction Die: 3 + 0 = 3\nChallenge Dice: 3, 1\nResultado: [~] WEAK HIT","Sofra -1 momentum.","Você fica incapacitado ou morrendo. Aliado deve intervir.","\n>>> FaceDeath <<<\nAction Die: 5 + 0 = 5\nChallenge Dice: 4, 6\nResultado: [~] WEAK HIT","[*] Oráculo: Resistir Dano (Rolou 2):\n-> O dano é mortal.","\n>>> EndureHarm <<<\nAction Die: 2 + 0 = 2\nChallenge Dice: 5, 2\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 45):\n-> Piora drasticamente (role novamente e aplique mas pior)","\n>>> PayThePrice <<<\nAction Die: 6 + 0 = 6\nChallenge Dice: 6, 1\nResultado: [~] WEAK HIT","Você prossegue apesar do dano.","\n>>> EndureHarm <<<\nAction Die: 6 + 0 = 6\nChallenge Dice: 5, 8\nResultado: [~] WEAK HIT","[*] Oráculo: Pagar o Preço (Rolou 24):\n-> Piora drasticamente (role novamente e aplique mas pior)","\n>>> PayThePrice <<<\nAction Die: 1 + 0 = 1\nChallenge Dice: 10, 7\nResultado: [X] MISS","\n>>> EndureHarm <<<\nAction Die: 4 + 0 = 4\nChallenge Dice: 3, 2\nResultado: [+] STRONG HIT","[*] Oráculo: Pagar o Preço (Rolou 21):\n-> Piora drasticamente (role novamente e aplique mas pior)","\n>>> PayThePrice <<<\nAction Die: 3 + 0 = 3\nChallenge Dice: 6, 6\nResultado: [X] MISS\n[!] MATCH detectado!","\n>>> PayThePrice <<<\nAction Die: 2 + 0 = 2\nChallenge Dice: 10, 3\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 96):\n-> Piora drasticamente (role novamente e aplique mas pior)","\n>>> PayThePrice <<<\nAction Die: 2 + 0 = 2\nChallenge Dice: 7, 1\nResultado: [~] WEAK HIT","[*] Oráculo: Pagar o Preço (Rolou 23):\n-> Sua ação tem um efeito não intencional","\n>>> Pay the Price <<<\nAction Die: 6 + 0 = 6\nChallenge Dice: 5, 5\nResultado: [+] STRONG HIT\n[!] MATCH detectado!","[*] Oráculo: Pagar o Preço (Rolou 90):\n-> Desperdiça recursos","\n>>> Pay the Price <<<\nAction Die: 3 + 0 = 3\nChallenge Dice: 10, 6\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 53):\n-> Causa atraso ou te coloca em desvantagem","\n>>> Pay the Price <<<\nAction Die: 6 + 0 = 6\nChallenge Dice: 6, 10\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 38):\n-> A situação atual piora","\n>>> Pay the Price <<<\nAction Die: 1 + 0 = 1\nChallenge Dice: 4, 4\nResultado: [X] MISS\n[!] MATCH detectado!","[*] Oráculo: Pagar o Preço (Rolou 15):\n-> Você é separado de algo ou alguém","\n>>> Pay the Price <<<\nAction Die: 6 + 0 = 6\nChallenge Dice: 4, 10\nResultado: [~] WEAK HIT","[*] Oráculo: Pagar o Preço (Rolou 56):\n-> Causa atraso ou te coloca em desvantagem","\n>>> Pay the Price <<<\nAction Die: 1 + 0 = 1\nChallenge Dice: 9, 9\nResultado: [X] MISS\n[!] MATCH detectado!","[*] Oráculo: Pagar o Preço (Rolou 90):\n-> Desperdiça recursos","\n>>> Pay the Price <<<\nAction Die: 2 + 0 = 2\nChallenge Dice: 10, 6\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 3):\n-> Uma pessoa ou comunidade confiável perde fé em você ou age contra você","\n>>> Pay the Price <<<\nAction Die: 1 + 0 = 1\nChallenge Dice: 9, 10\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 34):\n-> A situação atual piora","\n>>> Pay the Price <<<\nAction Die: 6 + 0 = 6\nChallenge Dice: 4, 10\nResultado: [~] WEAK HIT","[*] Oráculo: Pagar o Preço (Rolou 37):\n-> A situação atual piora","\n>>> Pay the Price <<<\nAction Die: 3 + 0 = 3\nChallenge Dice: 9, 5\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 26):\n-> Algo de valor é perdido ou destruído","\n>>> Pay the Price <<<\nAction Die: 4 + 0 = 4\nChallenge Dice: 6, 9\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 37):\n-> A situação atual piora","\n>>> Pay the Price <<<\nAction Die: 1 + 0 = 1\nChallenge Dice: 2, 2\nResultado: [X] MISS\n[!] MATCH detectado!","[*] Oráculo: Pagar o Preço (Rolou 55):\n-> Causa atraso ou te coloca em desvantagem","\n>>> Pay the Price <<<\nAction Die: 5 + 0 = 5\nChallenge Dice: 2, 5\nResultado: [~] WEAK HIT","[*] Oráculo: Pagar o Preço (Rolou 27):\n-> Algo de valor é perdido ou destruído","\n>>> Pay the Price <<<\nAction Die: 3 + 0 = 3\nChallenge Dice: 5, 10\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 10):\n-> Você é separado de algo ou alguém","\n>>> Pay the Price <<<\nAction Die: 6 + 0 = 6\nChallenge Dice: 3, 7\nResultado: [~] WEAK HIT","[*] Oráculo: Pagar o Preço (Rolou 17):\n-> Sua ação tem um efeito não intencional","\n>>> Pay the Price <<<\nAction Die: 4 + 0 = 4\nChallenge Dice: 1, 5\nResultado: [~] WEAK HIT","[*] Oráculo: Pagar o Preço (Rolou 83):\n-> Desenvolvimento surpreendente complica sua missão","\n>>> Pay the Price <<<\nAction Die: 2 + 0 = 2\nChallenge Dice: 9, 8\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 4):\n-> Uma pessoa ou comunidade confiável perde fé em você ou age contra você","\n>>> Pay the Price <<<\nAction Die: 6 + 0 = 6\nChallenge Dice: 3, 4\nResultado: [+] STRONG HIT","[*] Oráculo: Pagar o Preço (Rolou 93):\n-> Te força a agir contra suas melhores intenções","\n>>> Pay the Price <<<\nAction Die: 4 + 0 = 4\nChallenge Dice: 9, 10\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 25):\n-> Algo de valor é perdido ou destruído","\n>>> Pay the Price <<<\nAction Die: 1 + 0 = 1\nChallenge Dice: 6, 10\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 80):\n-> Desenvolvimento surpreendente complica sua missão","\n>>> Pay the Price <<<\nAction Die: 4 + 0 = 4\nChallenge Dice: 2, 5\nResultado: [~] WEAK HIT","[*] Oráculo: Região (Rolou 39):\n-> Os Refúgios","\n>>> Pay the Price <<<\nAction Die: 5 + 0 = 5\nChallenge Dice: 1, 5\nResultado: [~] WEAK HIT","[*] Oráculo: Pagar o Preço (Rolou 76):\n-> É estressante","\n>>> Pay the Price <<<\nAction Die: 4 + 0 = 4\nChallenge Dice: 10, 8\nResultado: [X] MISS","[*] Oráculo: Pagar o Preço (Rolou 36):\n-> A situação atual piora","\n>>> Pay the Price <<<\nAction Die: 2 + 0 = 2\nChallenge Dice: 10, 2\nResultado: [X] MISS","\n>>> Pay the Price <<<\nAction Die: 5 + 0 = 5\nChallenge Dice: 5, 10\nResultado: [X] MISS","Use: :oracle \"Pay the Price\" para ver o que acontece","\n>>> Pay the Price <<<\nAction Die: 4 + 0 = 4\nChallenge Dice: 8, 4\nResultado: [X] MISS","Descreva o que acontece de pior...","\n>>> Pay the Price <<<\nAction Die: 3 + 0 = 3\nChallenge Dice: 1, 5\nResultado: [~] WEAK HIT","Afinal, por quê estamos onde estamos? E ainda pior, COMO estamos? Distantes de casa, esquecidos, por muitas vezes revoltados... Nós fomos traídos.","Dados rolados: [(D4,3)]","-> Gisla, a Escudeira","-> Ragnar, o Espadachim","-> Ingrid, a Sacerdotisa","-> Eivor, o Lanceiro.","[*] Oráculo: Nomes Humanos (Rolou 67):\n-> Gisla","[*] Oráculo: Nomes Humanos (Rolou 98):\n-> Ragnar","[*] Oráculo: Nomes Humanos (Rolou 87):\n-> Ingrid","Nomes Humanos (Rolou 90):\n→ Ingrid","\n✓ Voto criado: Restaurar a honra dos cavaleiros da Décima Terceira divisão da Barreira (epic)\n  Progresso por mark: 1 ticks\n","Mas eu juro restaurar a nossa honra, a Décima Terceira divisão da Barreira!","Humilhados, afungentados, expulsos e hoje habitantes d'Os Refúgios, é assim que a 13a divisão vive nos dias de hoje","Região (Rolou 38):\n→ Os Refúgios","Meu nome é Eivor. Fui, outrora, membro dos Cavaleiros da Barreira, a mais nobre organização para militar de meu reino..."],"world":{"wData":[]}}
+{
+    "activeBonuses": [],
+    "bonds": [
+        {
+            "bondName": "Gisla",
+            "bondNotes": "A pessoa que me ensinou tudo que sei sobre combates de curta distância. A melhor professora que se pode querer e a pessoa mais justa que conheço. Esposa de minha irmã.",
+            "bondType": "PersonBond"
+        },
+        {
+            "bondName": "Ingrid",
+            "bondNotes": "O último vestígio de família que me restou. Minha irmã de sangue que amo muito.",
+            "bondType": "PersonBond"
+        },
+        {
+            "bondName": "Ragnar",
+            "bondNotes": "O último homem de confiança que restou nesta Terra. Meu bom e velho amigo de infância.",
+            "bondType": "Undefined"
+        }
+    ],
+    "mainCharacter": {
+        "attributes": {
+            "edge": 2,
+            "heart": 1,
+            "iron": 3,
+            "shadow": 1,
+            "wits": 2
+        },
+        "name": "Eivor",
+        "resources": {
+            "experience": 0,
+            "health": 5,
+            "momentum": 2,
+            "spirit": 5,
+            "supply": 5
+        }
+    },
+    "progressTracks": [
+        {
+            "trackCompleted": false,
+            "trackName": "Bonds",
+            "trackRank": "Troublesome",
+            "trackTicks": 4,
+            "trackType": "Bond"
+        },
+        {
+            "trackCompleted": false,
+            "trackName": "Restaurar a honra dos cavaleiros da Décima Terceira divisão da Barreira",
+            "trackRank": "Epic",
+            "trackTicks": 0,
+            "trackType": "Vow"
+        }
+    ],
+    "sessionLog": [
+        "Afinal, por quê estamos onde estamos? E ainda pior, COMO estamos? Distantes de casa, esquecidos, por muitas vezes revoltados... Nós fomos traídos.",
+        "-> Gisla, a Escudeira",
+        "-> Ragnar, o Espadachim",
+        "-> Ingrid, a Sacerdotisa",
+        "-> Eivor, o Lanceiro.",
+        "[*] Oráculo: Nomes Humanos (Rolou 67):\n-> Gisla",
+        "[*] Oráculo: Nomes Humanos (Rolou 98):\n-> Ragnar",
+        "[*] Oráculo: Nomes Humanos (Rolou 87):\n-> Ingrid",
+        "Nomes Humanos (Rolou 90):\n→ Ingrid",
+        "\n✓ Voto criado: Restaurar a honra dos cavaleiros da Décima Terceira divisão da Barreira (epic)\n  Progresso por mark: 1 ticks\n",
+        "Mas eu juro restaurar a nossa honra, a Décima Terceira divisão da Barreira!",
+        "Humilhados, afungentados, expulsos e hoje habitantes d'Os Refúgios, é assim que a 13a divisão vive nos dias de hoje",
+        "Região (Rolou 38):\n→ Os Refúgios",
+        "Meu nome é Eivor. Fui, outrora, membro dos Cavaleiros da Barreira, a mais nobre organização para militar de meu reino..."
+    ],
+    "world": {
+        "wData": []
+    }
+}
