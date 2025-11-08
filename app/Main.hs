@@ -1,20 +1,13 @@
-module Main where
+module Main (main) where
 
 import UI (runTui)
 import MainLoop (runGameLoop)
-import qualified System.DiceContract as Dice
 import qualified System.Impl.DiceService as DiceService
-import qualified System.GameContextContract as GameContext
 import qualified System.Impl.GameContextService as GameContextService
-import qualified System.ActionContract as Action
 import qualified System.Impl.ActionService as ActionService
-import qualified System.MoveContract as Move
 import qualified System.Impl.MoveService as MoveService
-import qualified System.ProgressContract as Progress
 import qualified System.Impl.ProgressService as ProgressService
-import qualified System.OracleContract as Oracle
 import qualified System.Impl.OracleService as OracleService
-import qualified System.HelpContract as Help
 import qualified System.Impl.HelpService as HelpService
 
 import Control.Concurrent (forkIO)

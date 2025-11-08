@@ -325,9 +325,10 @@ parseMoveParams moveHandler params@(first:rest) = (stat, text) where
 -- | Processes a list of consequences from moves or oracle results.
 -- Applies each consequence sequentially, handling resource changes,
 -- triggered actions, player choices, and narrative elements.
-processConsequences :: ActionContext -> Action.Handle -> [Consequence] -> GameContext.Context -> IO ()
+processConsequences :: ActionContext -> Action.Handle -> [Consequence] -> GameContext.Context -> IO Bool
 processConsequences aCtx actionH consequences ctx = do
   mapM_ (processConsequence aCtx actionH ctx) consequences
+  return True
 
 -- | Processes a single consequence using the recursive action architecture.
 -- Delegates resource changes and action triggers to Action.process for consistency.
@@ -378,6 +379,7 @@ processConsequence aCtx@ActionContext { contextHandler } actionH ctx cons = case
       Just choice -> do
         logMessage aCtx $ "\nVocê escolheu: " <> choiceDescription choice
         processConsequences aCtx actionH (choiceConsequences choice) ctx
+        return ()
       Nothing ->
         systemMessage aCtx "Nenhuma escolha válida."
 
@@ -401,23 +403,23 @@ markBondProgressTrack aCtx@ActionContext { contextHandler, progressHandler } _ac
     Just currentCtx -> do
       let bondTrackName = "Bonds"
       let maybeTrack = GameContext.getProgressTrack contextHandler currentCtx bondTrackName
-      
+
       (track, wasCreated) <- case maybeTrack of
         Just existingTrack -> return (existingTrack, False)
         Nothing -> do
           let newTrack = Progress.newProgressTrack bondTrackName Progress.Bond Progress.Troublesome
           return (newTrack, True)
-      
+
       -- Mark 1 tick (as per Ironsworn rules: 1 tick per Forge a Bond Strong Hit)
       updatedTrack <- Progress.markProgressTicks progressHandler track 1
-      
+
       -- Add track if it was just created, otherwise update it
       updatedCtx <- if wasCreated
         then GameContext.addProgressTrack contextHandler currentCtx updatedTrack
         else GameContext.updateProgressTrack contextHandler currentCtx bondTrackName updatedTrack
-      
+
       _ <- GameContext.saveContext contextHandler updatedCtx
-      
+
       let boxes = Progress.getProgressScore updatedTrack
       let ticks = Progress.trackTicks updatedTrack
       logMessage aCtx $ "[+] Bond progress: " <> T.pack (show boxes) <> "/10 boxes (" <> T.pack (show ticks) <> "/40 ticks)"
@@ -669,7 +671,7 @@ bondCommand aCtx@ActionContext { contextHandler } _ input = do
 
   processBondCommand Nothing = pure $ Left GameContext.InvalidCommand
   processBondCommand (Just validCommand) = (contextHandler&GameContext.processBondCommand) validCommand
-  
+
   log :: ActionContext -> Maybe GameContext.BondCommand -> Either GameContext.ContextError GameContext.BondProcessingResponse -> IO ()
   log aCtx (Just GameContext.BondCommand { bondCommandType = (GameContext.UpdateBondNotes _) }) (Right r) = logMessage aCtx (r&GameContext.systemMessage)
   log aCtx _ (Left (GameContext.FileError msg)) = systemMessage aCtx $ "Erro ao processar comando de bond: " <> T.pack msg

@@ -15,8 +15,7 @@ runGameLoop actionHandler inputChan _ = do
   let loop = do
         input <- atomically $ readTChan inputChan
         let (action, params) = parseCommand input
-        -- Debug: print to stderr to not interfere with TUI
-        -- putStrLn $ "DEBUG: Received command: " ++ show input ++ " -> Action: " ++ show action
+
         continue <- Action.process actionHandler action params
         if continue
           then loop

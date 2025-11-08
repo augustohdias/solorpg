@@ -84,8 +84,11 @@ runTui inputChan' outputChan = do
   clearScreen
   setCursorPosition 0 0
 
+systemSheetWidth :: Int
+systemSheetWidth = 40
+
 charSheetWidth :: Int
-charSheetWidth = 40
+charSheetWidth = 25
 
 -- Main drawing function
 drawTui :: TuiState -> [Widget Name]
@@ -100,7 +103,7 @@ drawTui ts = [ui]
     logPanel = withVScrollBars OnRight $ viewport LogViewport Vertical $ 
                vBox (intersperse (str " ") (map txtWrap (Vec.toList $ logs ts)))
     -- System panel on the right side, similar to Character block
-    systemPanel = hLimit charSheetWidth $ borderWithLabel (str " Sistema ") $ padAll 1 $
+    systemPanel = hLimit systemSheetWidth $ borderWithLabel (str " Sistema ") $ padAll 1 $
                   withVScrollBars OnRight $ viewport SystemViewport Vertical $
                   drawSystemMessages (systemMessages ts)
     inputBox = border $ vLimit 1 $ Ed.renderEditor (txt . T.concat) True (editor ts)
@@ -125,7 +128,7 @@ drawSystemMessages msgs =
 
 -- Draw character sheet
 drawCharacter :: Maybe GameContext.MainCharacter -> Widget Name
-drawCharacter Nothing = vCenter $ str "Sem personagem carregado.\n\nDigite :help para ver as\nopções de comando."
+drawCharacter Nothing = hCenter $ vCenter $ str "Sem personagem\ncarregado.\n\nDigite :help para ver\nas opções."
 drawCharacter (Just charData) =
   vBox [ hCenter $ str $ T.unpack (GameContext.name charData)
        , hCenter $ str " "
