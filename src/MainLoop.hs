@@ -28,35 +28,33 @@ parseCommand input =
   let text = T.strip input
   in if T.isPrefixOf ":" text
      then
-       let (cmd, params) = T.breakOn " " (T.drop 1 text)
+       let (cmd, params) = T.breakOn " " text
        in (parseActionType (T.map toLower cmd), T.strip params)
      else (Action.AddStoryLog, text)
 
 parseActionType :: T.Text -> Action.ActionType
 parseActionType cmd = case cmd of
-  "r" -> Action.RollDice
-  "roll" -> Action.RollDice
-  "exit" -> Action.Exit
-  "q" -> Action.Exit
-  "quit" -> Action.Exit
-  "show" -> Action.Show
-  "create" -> Action.CreateCharacter
-  "load" -> Action.LoadCharacter
-  "loadchar" -> Action.LoadCharacter  -- Alias for load
-  "char" -> Action.ShowCharacter
-  "showchar" -> Action.ShowCharacter  -- Alias for char
-  "setattr" -> Action.UpdateAttribute
-  "setres" -> Action.UpdateResource
-  "addattr" -> Action.AddAttribute
-  "addres" -> Action.AddResource
-  "challenge" -> Action.Challenge
-  "move" -> Action.Move
-  "vow" -> Action.SwearVow
-  "progress" -> Action.MarkProgress
-  "fulfill" -> Action.RollProgress
-  "tracks" -> Action.ShowTracks
-  "abandon" -> Action.AbandonTrack
-  "oracle" -> Action.Oracle
-  "help" -> Action.Help
-  "bond" -> Action.Bond
+  ":r" -> Action.RollDice
+  ":roll" -> Action.RollDice
+  ":exit" -> Action.Exit
+  ":q" -> Action.Exit
+  ":quit" -> Action.Exit
+  ":show" -> Action.Show
+  ":create" -> Action.CreateCharacter
+  ":load" -> Action.LoadCharacter
+  ":char" -> Action.ShowCharacter
+  ":setattr" -> Action.UpdateAttribute
+  ":setres" -> Action.UpdateResource
+  ":addattr" -> Action.AddAttribute
+  ":addres" -> Action.AddResource
+  ":challenge" -> Action.Challenge
+  ":move" -> Action.Move
+  ":vow" -> Action.SwearVow
+  ":progress" -> Action.MarkProgress
+  ":fulfill" -> Action.RollProgress
+  ":tracks" -> Action.ShowTracks
+  ":abandon" -> Action.AbandonTrack
+  ":oracle" -> Action.Oracle
+  ":help" -> Action.Help
+  ":bond" -> Action.Bond
   _ -> Action.Unknown

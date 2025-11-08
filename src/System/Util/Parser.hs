@@ -9,15 +9,15 @@ module System.Util.Parser
     parseAttributes
   , parseAttributeUpdate
   , parseAttributeAdd
-  
+
   -- * Parsing de recursos
   , parseResourceUpdate
   , parseResourceAdd
-  
+
   -- * Parsing de progress tracks
   , parseRank
   , rankToText
-  
+
   -- * Parsing genérico
   , parseKeyValue
   , parseDecimal
@@ -26,6 +26,9 @@ module System.Util.Parser
   , parseOracleQuery
   , formatProgressTrack
   , formatProgressRollResult
+
+  -- * Parsing de vínculos
+  , parseBondCommand
   -- * Funções auxiliares
   , clamp
   ) where
@@ -36,6 +39,8 @@ import qualified System.DiceContract as Dice
 import qualified System.Constants as C
 import qualified Data.Text as T
 import qualified Data.Text.Read as TR
+import Data.Char (isSpace)
+import Data.Maybe (fromMaybe)
 
 
 formatProgressTrack :: Progress.ProgressTrack -> T.Text
@@ -159,6 +164,100 @@ parseResourceAdd input res = do
     "momentum"   -> Just $ res { GameContext.momentum   = GameContext.momentum res + delta }
     "experience" -> Just $ res { GameContext.experience = max 0 (GameContext.experience res + delta) }
     _            -> Nothing
+
+parseBondCommand :: T.Text -> Maybe GameContext.BondCommand
+parseBondCommand input =
+  case tokens of
+    [] ->
+      Just $ GameContext.BondCommand GameContext.ListBonds emptyBond
+    [single] ->
+      let name = stripQuotes single
+          bond = emptyBond { GameContext.bondName = name }
+      in Just $ GameContext.BondCommand (GameContext.ListBondNotes name) bond
+    (token:_) ->
+      let lowerToken = T.toLower token
+      in case lowerToken of
+           "add"    -> buildAddCommand GameContext.AddBond GameContext.PersonBond argsText
+           "addc"   -> buildAddCommand GameContext.AddCommunityBond GameContext.CommunityBond argsText
+           "remove" -> buildRemoveCommand argsText
+           _        -> buildUpdateCommand trimmedInput
+  where
+    trimmedInput = T.strip input
+    tokens = T.words trimmedInput
+    argsText = dropFirstToken trimmedInput
+
+    emptyBond =
+      GameContext.Bond
+        { GameContext.bondName = ""
+        , GameContext.bondType = GameContext.Undefined
+        , GameContext.bondNotes = ""
+        }
+
+    buildAddCommand cmd bondType text = do
+      (name, notes) <- parseNameAndNotes text
+      let bond =
+            GameContext.Bond
+              { GameContext.bondName = name
+              , GameContext.bondType = bondType
+              , GameContext.bondNotes = notes
+              }
+      Just $ GameContext.BondCommand cmd bond
+
+    buildRemoveCommand text = do
+      (name, _) <- parseNameAndNotes text
+      let bond = emptyBond { GameContext.bondName = name }
+      Just $ GameContext.BondCommand GameContext.RemoveBond bond
+
+    buildUpdateCommand text = do
+      (name, notes) <- parseNameAndNotes text
+      let bond =
+            GameContext.Bond
+              { GameContext.bondName = name
+              , GameContext.bondType = GameContext.Undefined
+              , GameContext.bondNotes = notes
+              }
+      Just $ GameContext.BondCommand (GameContext.UpdateBondNotes name) bond
+
+    parseNameAndNotes raw
+      | T.null trimmed = Nothing
+      | T.isPrefixOf "\"" trimmed =
+          case separateStrings trimmed of
+            [] -> Nothing
+            (nameSegment:rest) ->
+              let notes = cleanNote (T.unwords rest)
+              in Just (nameSegment, notes)
+      | otherwise =
+          case T.words trimmed of
+            [] -> Nothing
+            (nameToken:restTokens) ->
+              let name = stripQuotes nameToken
+                  notes = cleanNote (T.unwords restTokens)
+              in Just (name, notes)
+      where
+        trimmed = T.strip raw
+
+    dropFirstToken txt =
+      let stripped = T.stripStart txt
+          (_, rest) = T.break isSpace stripped
+      in T.stripStart rest
+
+    stripQuotes txt =
+      fromMaybe stripped (T.stripPrefix "\"" stripped >>= T.stripSuffix "\"")
+      where
+        stripped = T.strip txt
+
+    cleanNote = stripQuotes . T.strip
+
+-- Função que separa strings entre aspas duplas usando Text
+separateStrings :: T.Text -> [T.Text]
+separateStrings texto = case T.uncons texto of
+    Nothing -> []
+    Just ('"', resto) ->
+        let (str, resto') = T.break (== '"') resto
+        in if T.null resto'
+           then [str]  -- Caso não tenha aspas de fechamento
+           else str : separateStrings (T.tail resto')
+    Just (_, resto) -> separateStrings resto
 
 -- | Funções auxiliares de parsing
 parseKeyValue :: T.Text -> Maybe (T.Text, T.Text)

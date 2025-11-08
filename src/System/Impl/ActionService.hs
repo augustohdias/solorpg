@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
+{-# OPTIONS_GHC -Wno-name-shadowing #-}
 module System.Impl.ActionService (newHandle) where
 
 import qualified System.ActionContract as Action
@@ -19,8 +21,10 @@ import qualified Data.Text.Read as TR
 import System.Tui.Comm (GameOutput(..), MessageType(..))
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
 import Control.Monad (void, unless)
-import Data.Foldable (for_, forM_, find)
+import Data.Foldable (for_, forM_)
 import Data.Maybe (fromMaybe)
+import Data.Function ((&))
+import System.GameContextContract (BondCommand(..))
 
 -- | Creates a new Action Service handle that orchestrates communication between
 -- game subsystems and the TUI. This service acts as the central coordinator,
@@ -101,7 +105,7 @@ whenContext ActionContext { contextHandler } action = do
 -- | Default handler for unknown or unimplemented action types.
 -- Always returns False to indicate the action was not processed.
 defaultAction :: ActionContext -> T.Text -> IO Bool
-defaultAction _ _ = return False
+defaultAction _ _ = return True
 
 -- | Adds a narrative entry to the character's session log.
 -- Ignores entries starting with ':' (commands) and only processes story text.
@@ -657,126 +661,17 @@ abandonTrack aCtx@ActionContext { contextHandler } actionH input = withContext a
 -- All bond operations update the character context and provide system feedback.
 -- Adding a bond also marks progress on the bonds track (as per Ironsworn rules).
 bondCommand :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-bondCommand aCtx@ActionContext { contextHandler } actionH input = withContext aCtx $ \ctx -> do
-  let parts = T.words (T.strip input)
-  case parts of
-    [] -> listBonds aCtx ctx
-    ("add":nameParts) -> addBond aCtx actionH ctx (T.unwords nameParts) GameContext.PersonBond
-    ("addplace":nameParts) -> addBond aCtx actionH ctx (T.unwords nameParts) GameContext.PlaceBond
-    ("addcomm":nameParts) -> addBond aCtx actionH ctx (T.unwords nameParts) GameContext.CommunityBond
-    ("remove":nameParts) -> removeBond aCtx ctx (T.unwords nameParts)
-    ("note":rest) -> updateBondNotes aCtx ctx (T.unwords rest)
-    _ -> do
-      systemMessage aCtx "Uso: :bond [add|addplace|addcomm|remove|note] \"<nome>\" [\"<nota>\"] ou :bond para listar"
-      return True
-  where
-    listBonds aCtx' _ctx = do
-      -- Always get current context from MVar to ensure we have the latest bonds
-      maybeCurrentCtx <- GameContext.getCurrentContext contextHandler
-      case maybeCurrentCtx of
-        Nothing -> do
-          systemMessage aCtx' "Erro: contexto não carregado."
-          return True
-        Just currentCtx -> do
-          let bonds = GameContext.listBonds contextHandler currentCtx
-          if null bonds
-            then systemMessage aCtx' "Nenhum bond registrado."
-            else mapM_ (showBond aCtx') bonds
-          return True
+bondCommand aCtx@ActionContext { contextHandler } _ input = do
+  _ <- processBondCommand maybeValidCommand >>= log aCtx maybeValidCommand
+  return True where
 
-    showBond aCtx' bond = do
-      let bondType = case GameContext.bondType bond of
-            GameContext.PersonBond -> "Pessoa"
-            GameContext.CommunityBond -> "Comunidade"
-            GameContext.PlaceBond -> "Lugar"
-      systemMessage aCtx' $ "• " <> GameContext.bondName bond <> " (" <> T.pack bondType <> ")"
-      unless (T.null (GameContext.bondNotes bond)) $
-        systemMessage aCtx' $ "  " <> GameContext.bondNotes bond
+  maybeValidCommand = Parser.parseBondCommand input
 
-    addBond aCtx' actionH' _ctx bondName bondType
-      | T.null bondName = do
-          let typeHint = case bondType of
-                GameContext.PersonBond -> "Uso: :bond add \"<nome>\""
-                GameContext.PlaceBond -> "Uso: :bond addplace \"<nome>\""
-                GameContext.CommunityBond -> "Uso: :bond addcomm \"<nome>\""
-          systemMessage aCtx' typeHint
-          return True
-      | otherwise = do
-          -- Always get current context from MVar to ensure we have the latest state
-          maybeCurrentCtx <- GameContext.getCurrentContext contextHandler
-          case maybeCurrentCtx of
-            Nothing -> do
-              systemMessage aCtx' "Erro: contexto não carregado."
-              return True
-            Just currentCtx -> do
-              let bond = GameContext.Bond { GameContext.bondName = bondName
-                                          , GameContext.bondType = bondType
-                                          , GameContext.bondNotes = ""
-                                          }
-              updatedCtx <- GameContext.addBond contextHandler currentCtx bond
-              _ <- GameContext.saveContext contextHandler updatedCtx
-              -- Mark progress on bonds track (as per Ironsworn rules)
-              markBondProgressTrack aCtx' actionH' updatedCtx
-              let typeMsg = case bondType of
-                    GameContext.PersonBond -> "Bond adicionado"
-                    GameContext.PlaceBond -> "Bond com lugar adicionado"
-                    GameContext.CommunityBond -> "Bond com comunidade adicionado"
-              systemMessage aCtx' $ "[+] " <> T.pack typeMsg <> ": " <> bondName
-              return True
-
-    removeBond aCtx' _ctx bondName
-      | T.null bondName = do
-          systemMessage aCtx' "Uso: :bond remove \"<nome>\""
-          return True
-      | otherwise = do
-          -- Always get current context from MVar to ensure we have the latest bonds
-          maybeCurrentCtx <- GameContext.getCurrentContext contextHandler
-          case maybeCurrentCtx of
-            Nothing -> do
-              systemMessage aCtx' "Erro: contexto não carregado."
-              return True
-            Just currentCtx -> do
-              updatedCtx <- GameContext.removeBond contextHandler currentCtx bondName
-              _ <- GameContext.saveContext contextHandler updatedCtx
-              systemMessage aCtx' $ "[-] Bond removido: " <> bondName
-              return True
-
-    updateBondNotes aCtx' _ctx noteInput
-      | T.null noteInput = do
-          systemMessage aCtx' "Uso: :bond note \"<nome>\" \"<nota>\""
-          return True
-      | otherwise = case parseTwoQuotedStrings noteInput of
-          Nothing -> do
-            systemMessage aCtx' "Uso: :bond note \"<nome>\" \"<nota>\""
-            return True
-          Just (bondName, newNote) -> do
-            -- Always get current context from MVar to ensure we have the latest bonds
-            maybeCurrentCtx <- GameContext.getCurrentContext contextHandler
-            case maybeCurrentCtx of
-              Nothing -> do
-                systemMessage aCtx' "Erro: contexto não carregado."
-                return True
-              Just currentCtx -> do
-                let bonds = GameContext.listBonds contextHandler currentCtx
-                case findBondByName bonds bondName of
-                  Nothing -> do
-                    systemMessage aCtx' $ "Bond não encontrado: " <> bondName
-                    return True
-                  Just existingBond -> do
-                    let currentNotes = GameContext.bondNotes existingBond
-                    let updatedNotes = if T.null currentNotes
-                                       then newNote
-                                       else currentNotes <> "\n" <> newNote
-                    let updatedBond = existingBond { GameContext.bondNotes = updatedNotes }
-                    updatedCtx <- GameContext.updateBond contextHandler currentCtx bondName updatedBond
-                    _ <- GameContext.saveContext contextHandler updatedCtx
-                    systemMessage aCtx' $ "[+] Nota adicionada a " <> bondName <> ": " <> newNote
-                    return True
-
-    parseTwoQuotedStrings :: T.Text -> Maybe (T.Text, T.Text)
-    parseTwoQuotedStrings textInput = do
-      (first, rest) <- Parser.parseQuotedString textInput
-      (second, _) <- Parser.parseQuotedString (T.strip rest)
-      return (first, second)
-
-    findBondByName bonds name = find (\b -> GameContext.bondName b == name) bonds
+  processBondCommand Nothing = pure $ Left GameContext.InvalidCommand
+  processBondCommand (Just validCommand) = (contextHandler&GameContext.processBondCommand) validCommand
+  
+  log :: ActionContext -> Maybe GameContext.BondCommand -> Either GameContext.ContextError GameContext.BondProcessingResponse -> IO ()
+  log aCtx (Just GameContext.BondCommand { bondCommandType = (GameContext.UpdateBondNotes _) }) (Right r) = logMessage aCtx (r&GameContext.systemMessage)
+  log aCtx _ (Left (GameContext.FileError msg)) = systemMessage aCtx $ "Erro ao processar comando de bond: " <> T.pack msg
+  log aCtx _ (Left _) = systemMessage aCtx "Erro desconhecido ao processar comando de bond."
+  log aCtx _ (Right r) = systemMessage aCtx (r&GameContext.systemMessage)

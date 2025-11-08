@@ -27,7 +27,10 @@ module System.GameContextContract
   , BonusType (..)
   , Bond (..)
   , BondType (..)
-  
+  , BondCommandType (..)
+  , BondCommand (..)
+  , BondProcessingResponse (..)
+
     -- * Derived functions
   , getCharacterName
   , isContextInitialized
@@ -59,6 +62,7 @@ data BondType
   = PersonBond      -- ^ Vínculo com pessoa
   | CommunityBond   -- ^ Vínculo com comunidade
   | PlaceBond       -- ^ Vínculo com lugar
+  | Undefined
   deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
 -- | Vínculo com pessoa, comunidade ou lugar
@@ -126,6 +130,7 @@ instance FromJSON Context where
 data ContextError
     = ContextNotInitialized       -- ^ Contexto não foi inicializado
     | CharacterAlreadyExists      -- ^ Personagem já existe
+    | InvalidCommand
     | InvalidCharacterName        -- ^ Nome de personagem inválido
     | FileError String            -- ^ Erro ao manipular arquivo
     | ParseError String           -- ^ Erro ao parsear JSON
@@ -191,22 +196,24 @@ data Handle = Handle
     , clearBonuses :: !(Context -> IO Context)
     
     -- | Adiciona bond
-    , addBond :: !(Context -> Bond -> IO Context)
+    , addBond :: !(Context -> Bond -> IO (Either ContextError BondProcessingResponse))
     
     -- | Remove bond
-    , removeBond :: !(Context -> T.Text -> IO Context)
+    , removeBond :: !(Context -> T.Text -> IO (Either ContextError BondProcessingResponse))
     
     -- | Verifica se tem bond com nome
     , hasBond :: !(Context -> T.Text -> Bool)
     
     -- | Lista todos os bonds
-    , listBonds :: !(Context -> [Bond])
+    , listBonds :: !(Context -> IO (Either ContextError BondProcessingResponse))
     
     -- | Atualiza bond existente
-    , updateBond :: !(Context -> T.Text -> Bond -> IO Context)
+    , updateBond :: !(Context -> T.Text -> Bond -> IO (Either ContextError BondProcessingResponse))
 
     -- | Remove o arquivo de contexto
     , deleteContext :: !(T.Text -> IO (Either ContextError ()))
+
+    , processBondCommand :: !(BondCommand -> IO (Either ContextError BondProcessingResponse))
     }
 
 -- | Obtém o nome do personagem principal do contexto
@@ -216,3 +223,16 @@ getCharacterName = name . mainCharacter
 -- | Verifica se o contexto está inicializado
 isContextInitialized :: Maybe Context -> Bool
 isContextInitialized = Data.Maybe.isJust
+
+
+data BondCommandType = AddBond | AddPlaceBond | AddCommunityBond | RemoveBond | UpdateBondNotes T.Text | ListBonds | ListBondNotes T.Text
+
+data BondCommand = BondCommand
+  { bondCommandType :: BondCommandType
+  , bond :: Bond
+  }
+
+data BondProcessingResponse = Response
+  { bondProcessingResult :: Context
+  , systemMessage :: T.Text
+  }
