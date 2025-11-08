@@ -56,4 +56,5 @@ parseActionType cmd = case cmd of
   ":oracle" -> Action.Oracle
   ":help" -> Action.Help
   ":bond" -> Action.Bond
+  ":choice" -> Action.ResolveChoice
   _ -> Action.Unknown

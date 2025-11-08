@@ -29,14 +29,12 @@ import System.ConsequenceContract (Consequence(..))
 data OracleEntry = OracleEntry
   { entryRange :: !(Int, Int)           -- ^ Range de valores (ex: 1-10)
   , entryText :: !T.Text                -- ^ Texto do resultado
-  , entryConsequence :: !(Maybe T.Text) -- ^ Consequência executável opcional (backward compatibility)
   , entryConsequences :: ![Consequence] -- ^ Consequências estruturadas
   } deriving (Eq, Show, Generic, ToJSON)
 instance FromJSON OracleEntry where
   parseJSON = withObject "OracleEntry" $ \v -> OracleEntry
     <$> v .: "entryRange"
     <*> v .: "entryText"
-    <*> v .:? "entryConsequence" .!= Nothing
     <*> v .:? "entryConsequences" .!= []
 
 -- | Tabela de oráculo
@@ -55,7 +53,6 @@ data OracleResult = OracleResult
   { resultOracle :: !T.Text          -- ^ Nome do oráculo consultado
   , resultRoll :: !Int               -- ^ Valor rolado
   , resultText :: !T.Text            -- ^ Texto do resultado
-  , resultConsequence :: !(Maybe T.Text)  -- ^ Consequência opcional (backward compatibility)
   , resultConsequences :: ![Consequence]  -- ^ Consequências estruturadas
   } deriving (Eq, Show)
 

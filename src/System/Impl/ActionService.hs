@@ -18,13 +18,24 @@ import qualified System.Constants as C
 import qualified System.Util.Parser as Parser
 import qualified Data.Text as T
 import qualified Data.Text.Read as TR
-import System.Tui.Comm (GameOutput(..), MessageType(..))
+import System.Tui.Comm
+  ( GameOutput(..)
+  , MessageType(..)
+  , ChoicePromptPayload(..)
+  , ChoiceOptionPayload(..)
+  , ChoiceSelectionPayload(..)
+  )
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
 import Control.Monad (void, unless)
 import Data.Foldable (for_, forM_)
 import Data.Maybe (fromMaybe)
 import Data.Function ((&))
 import System.GameContextContract (BondCommand(..))
+import qualified Data.Aeson as Aeson
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Text.Encoding as TE
+import System.Random (randomIO)
 
 -- | Creates a new Action Service handle that orchestrates communication between
 -- game subsystems and the TUI. This service acts as the central coordinator,
@@ -68,6 +79,7 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
       Action.Bond -> bondCommand aCtx actionHandle
       Action.Oracle -> oracleQuery aCtx actionHandle
       Action.Help -> helpCommand aCtx
+      Action.ResolveChoice -> resolveChoice aCtx actionHandle
       _ -> defaultAction aCtx
 
 -- | Sends narrative messages to the TUI log channel.
@@ -325,71 +337,128 @@ parseMoveParams moveHandler params@(first:rest) = (stat, text) where
 -- | Processes a list of consequences from moves or oracle results.
 -- Applies each consequence sequentially, handling resource changes,
 -- triggered actions, player choices, and narrative elements.
-processConsequences :: ActionContext -> Action.Handle -> [Consequence] -> GameContext.Context -> IO Bool
-processConsequences aCtx actionH consequences ctx = do
-  mapM_ (processConsequence aCtx actionH ctx) consequences
-  return True
+processConsequences :: ActionContext -> Action.Handle -> [Consequence] -> GameContext.Context -> IO ()
+processConsequences aCtx actionH consequences ctx = go consequences
+  where
+    go [] = pure ()
+    go (current:rest) = do
+      shouldPause <- processConsequence aCtx actionH ctx current rest
+      unless shouldPause (go rest)
 
 -- | Processes a single consequence using the recursive action architecture.
 -- Delegates resource changes and action triggers to Action.process for consistency.
 -- Handles narrative text, resource modifications, move chaining, and player choices.
-processConsequence :: ActionContext -> Action.Handle -> GameContext.Context -> Consequence -> IO ()
-processConsequence aCtx@ActionContext { contextHandler } actionH ctx cons = case cons of
-  Narrative text ->
+-- Returns True when execution should pause awaiting player input.
+processConsequence :: ActionContext -> Action.Handle -> GameContext.Context -> Consequence -> [Consequence] -> IO Bool
+processConsequence aCtx@ActionContext { contextHandler } actionH ctx cons remaining = case cons of
+  Narrative text -> do
     void $ Action.process actionH Action.AddStoryLog text
+    pure False
 
   LoseHealth amount ->
-    applyResourceDelta aCtx actionH "health" (-amount)
+    applyResourceDelta aCtx actionH "health" (-amount) >> pure False
 
   LoseSpirit amount ->
-    applyResourceDelta aCtx actionH "spirit" (-amount)
+    applyResourceDelta aCtx actionH "spirit" (-amount) >> pure False
 
   LoseSupply amount ->
-    applyResourceDelta aCtx actionH "supply" (-amount)
+    applyResourceDelta aCtx actionH "supply" (-amount) >> pure False
 
   LoseMomentum amount ->
-    applyResourceDelta aCtx actionH "momentum" (-amount)
+    applyResourceDelta aCtx actionH "momentum" (-amount) >> pure False
 
   GainHealth amount ->
-    applyResourceDelta aCtx actionH "health" amount
+    applyResourceDelta aCtx actionH "health" amount >> pure False
 
   GainSpirit amount ->
-    applyResourceDelta aCtx actionH "spirit" amount
+    applyResourceDelta aCtx actionH "spirit" amount >> pure False
 
   GainSupply amount ->
-    applyResourceDelta aCtx actionH "supply" amount
+    applyResourceDelta aCtx actionH "supply" amount >> pure False
 
   GainMomentum amount ->
-    applyResourceDelta aCtx actionH "momentum" amount
+    applyResourceDelta aCtx actionH "momentum" amount >> pure False
 
   TriggerMove nextMoveType -> do
     logMessage aCtx $ "\n>>> Executando " <> Consequence.moveTypeToText nextMoveType <> " automaticamente..."
     let nextMoveText = T.toLower (Consequence.moveTypeToText nextMoveType)
     _ <- Action.process actionH Action.Move nextMoveText
-    return ()
+    return False
 
   TriggerOracle oracleName -> do
     logMessage aCtx $ "\n[*] Consultando oráculo " <> oracleName <> " automaticamente..."
     _ <- Action.process actionH Action.Oracle oracleName
-    return ()
+    return False
 
-  PlayerChoice choices -> do
-    maybeChoice <- Move.showChoices (moveHandler aCtx) choices
-    case maybeChoice of
-      Just choice -> do
-        logMessage aCtx $ "\nVocê escolheu: " <> choiceDescription choice
-        processConsequences aCtx actionH (choiceConsequences choice) ctx
-        return ()
-      Nothing ->
-        systemMessage aCtx "Nenhuma escolha válida."
+  PlayerChoice choices ->
+    presentPlayerChoice aCtx choices remaining >> return True
 
   AddBonus bonus -> do
     updatedCtx <- GameContext.addBonus contextHandler ctx bonus
     _ <- GameContext.saveContext contextHandler updatedCtx
     systemMessage aCtx $ "Bônus adicionado: " <> GameContext.bonusDescription bonus <> " (+" <> T.pack (show (GameContext.bonusValue bonus)) <> ")"
+    return False
 
   MarkBondProgress -> do
     markBondProgressTrack aCtx actionH ctx
+    return False
+
+-- | Sends a structured choice prompt to the TUI, encoding each option's full
+-- consequence chain (including remaining consequences) so the UI can forward
+-- the selection back through the input channel.
+presentPlayerChoice :: ActionContext -> [Choice] -> [Consequence] -> IO ()
+presentPlayerChoice aCtx@ActionContext { tuiOutputChannel } choices remaining = do
+  promptIdSeed <- randomIO :: IO Int
+  let promptId = T.pack $ "choice-" <> show (abs promptIdSeed)
+      options =
+        zipWith
+          (\idx Choice { choiceDescription, choiceConsequences } ->
+             ChoiceOptionPayload
+               { choiceOptionIndex = idx
+               , choiceOptionLabel = choiceDescription
+               , choiceOptionConsequences = encodeConsequencesToText (choiceConsequences ++ remaining)
+               })
+          [1 ..]
+          choices
+      payload =
+        ChoicePromptPayload
+          { choicePromptId = promptId
+          , choicePromptTitle = "Escolha uma opção"
+          , choicePromptMessage = "Use ↑/↓ ou números para navegar. Enter confirma, ESC cancela."
+          , choicePromptOptions = options
+          }
+  atomically $ writeTChan tuiOutputChannel (ChoicePrompt payload)
+  systemMessage aCtx "Escolha uma opção para continuar o movimento."
+
+-- | Encodes a consequence list to a JSON Text representation.
+encodeConsequencesToText :: [Consequence] -> T.Text
+encodeConsequencesToText =
+  TL.toStrict . TLE.decodeUtf8 . Aeson.encode
+
+-- | Handles the command that resolves a pending player choice sent from the TUI.
+resolveChoice :: ActionContext -> Action.Handle -> T.Text -> IO Bool
+resolveChoice aCtx@ActionContext { contextHandler } actionH rawInput =
+  case Aeson.eitherDecodeStrict (TE.encodeUtf8 rawInput) of
+    Left err -> do
+      systemMessage aCtx $ "Erro ao interpretar escolha: " <> T.pack err
+      return True
+    Right selection ->
+      if choiceSelectionCancelled selection
+        then do
+          systemMessage aCtx "Escolha cancelada."
+          return True
+        else do
+          maybeCtx <- GameContext.getCurrentContext contextHandler
+          case maybeCtx of
+            Nothing -> do
+              systemMessage aCtx "Nenhum personagem carregado. Não é possível aplicar a escolha."
+              return True
+            Just ctx -> do
+              let desc = choiceSelectionLabel selection
+              unless (T.null desc) $
+                logMessage aCtx $ "\nVocê escolheu: " <> desc
+              processConsequences aCtx actionH (choiceSelectionConsequences selection) ctx
+              return True
 
 -- | Marks progress on the bonds track when Forge a Bond succeeds.
 -- Creates the bonds track if it doesn't exist (rank doesn't matter for bonds track).

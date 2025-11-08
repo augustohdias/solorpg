@@ -147,10 +147,12 @@ getPayThePriceConsequences _result _isMatch =
           [Narrative "Descreva o que acontece de pior..."]
       
       , Choice "Visualizar dois resultados e usar Ask the Oracle (sim/não)" 
-          [Narrative "Role 1d2: 1=primeiro resultado, 2=segundo resultado"]
+          [ Narrative "Role 1d2: 1=primeiro resultado, 2=segundo resultado"
+          , TriggerOracle "Default"
+          ]
       
-      , Choice "Rolar na tabela Pay the Price (use :oracle \"Pay the Price\")" 
-          [Narrative "Use: :oracle \"Pay the Price\" para ver o que acontece"]
+      , Choice "Rolar na tabela Pagar o Preço" 
+          [TriggerOracle "\"Pagar o Preço\""]
       ]
   ]
 
@@ -390,7 +392,11 @@ getCompelConsequences result = case result of
   
   WeakHit ->
     [ Narrative "Como Strong Hit, mas eles pedem algo em retorno."
-    , Narrative "Visualize o que eles querem (Ask the Oracle se incerto)."
+    , PlayerChoice
+        [ Choice "Decida sem consultar o oráculo" []
+        , Choice "Pergunte ao oráculo (sim/não) para saber o que eles exigem"
+            [TriggerOracle "Default"]
+        ]
     ]
   
   Miss ->
@@ -573,7 +579,7 @@ getEndurHarmConsequences result = case result of
   
   Miss -> 
     [ LoseMomentum 1
-    , TriggerOracle "Endure Harm"  -- Se health = 0, executa oráculo automaticamente
+    , TriggerOracle "\"Resistir Dano\""  -- Se health = 0, executa oráculo automaticamente
     , Narrative "Sofra -1 momentum."
     ]
   
@@ -606,7 +612,7 @@ getEndurStressConsequences result = case result of
   
   Miss -> 
     [ LoseMomentum 1
-    , TriggerOracle "Endure Stress"  -- Se spirit = 0, executa oráculo automaticamente
+    , TriggerOracle "\"Resistir Estresse\""  -- Se spirit = 0, executa oráculo automaticamente
     , Narrative "Sofra -1 momentum."
     ]
   
@@ -654,8 +660,7 @@ getAdvanceConsequences result = case result of
 
 -- | Ask the Oracle - Consulte oráculo (não usa roll padrão)
 getAskOracleConsequences :: RollResult -> [Consequence]
-getAskOracleConsequences _result =
-  [Narrative "Use :oracle \"Nome\" para consultar oráculos."]
+getAskOracleConsequences _result = [TriggerOracle "Default"]
 
 -- | Consequências padrão para moves não implementados
 getDefaultConsequences :: RollResult -> [Consequence]

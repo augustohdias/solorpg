@@ -117,7 +117,6 @@ queryOracleImpl iHandle oracleName rollValue = do
           { Oracle.resultOracle = actualName
           , Oracle.resultRoll = rollValue
           , Oracle.resultText = Oracle.entryText entry
-          , Oracle.resultConsequence = Oracle.entryConsequence entry
           , Oracle.resultConsequences = Oracle.entryConsequences entry
           }
 

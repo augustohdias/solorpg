@@ -48,6 +48,7 @@ data ActionType
   | Oracle              -- ^ Consulta oráculo
   | Help                -- ^ Mostra ajuda
   | Bond                -- ^ Gerencia bonds (vínculos)
+  | ResolveChoice       -- ^ Resolve uma escolha pendente enviada pela TUI
   | Unknown             -- ^ Ação desconhecida
   deriving (Show, Eq)
 

@@ -3,11 +3,11 @@
   "oracleDescription": "Tabela de consequências quando health = 0 em Endure Harm Miss",
   "oracleDice": "1d100",
   "oracleEntries": [
-    {"entryRange": [1, 10], "entryText": "O dano é mortal.", "entryConsequence": "move:Face Death"},
-    {"entryRange": [11, 20], "entryText": "Você está morrendo. Cure-se em uma ou duas horas ou Face Death.", "entryConsequence": null},
-    {"entryRange": [21, 35], "entryText": "Você está inconsciente. Volta aos sentidos em uma ou duas horas.", "entryConsequence": null},
-    {"entryRange": [36, 50], "entryText": "Você está cambaleando. Qualquer atividade vigorosa requer rolar nesta tabela novamente.", "entryConsequence": null},
-    {"entryRange": [51, 100], "entryText": "Você está machucado mas ainda de pé.", "entryConsequence": null}
+    {"entryRange": [1, 10], "entryText": "O dano é mortal.", "entryConsequences": [ { "tag": "TriggerMove", "contents": "FaceDeath" } ]},
+    {"entryRange": [11, 20], "entryText": "Você está morrendo. Cure-se em uma ou duas horas ou Face Death.", "entryConsequences": []},
+    {"entryRange": [21, 35], "entryText": "Você está inconsciente. Volta aos sentidos em uma ou duas horas.", "entryConsequences": []},
+    {"entryRange": [36, 50], "entryText": "Você está cambaleando. Qualquer atividade vigorosa requer rolar nesta tabela novamente.", "entryConsequences": []},
+    {"entryRange": [51, 100], "entryText": "Você está machucado mas ainda de pé.", "entryConsequences": []}
   ]
 }
 
