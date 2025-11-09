@@ -1,41 +1,36 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NamedFieldPuns #-}
-{-# OPTIONS_GHC -Wno-unused-do-bind #-}
-{-# OPTIONS_GHC -Wno-name-shadowing #-}
+{-# LANGUAGE OverloadedStrings #-}
+
 module System.Impl.ActionService (newHandle) where
 
-import qualified System.ActionContract as Action
-import System.ActionContract (ActionContext(..))
-import qualified System.DiceContract as Dice
-import qualified System.GameContextContract as GameContext
-import qualified System.MoveContract as Move
-import qualified System.ProgressContract as Progress
-import qualified System.OracleContract as Oracle
-import qualified System.HelpContract as Help
-import qualified System.ConsequenceContract as Consequence
-import System.ConsequenceContract (Consequence(..), Choice(..))
-import qualified System.Constants as C
-import qualified System.Util.Parser as Parser
-import qualified Data.Text as T
-import qualified Data.Text.Read as TR
-import System.Tui.Comm
-  ( GameOutput(..)
-  , MessageType(..)
-  , ChoicePromptPayload(..)
-  , ChoiceOptionPayload(..)
-  , ChoiceSelectionPayload(..)
-  )
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
-import Control.Monad (void, unless)
-import Data.Foldable (for_, forM_)
-import Data.Maybe (fromMaybe)
-import Data.Function ((&))
-import System.GameContextContract (BondCommand(..))
+import Control.Monad (unless, void)
 import qualified Data.Aeson as Aeson
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Encoding as TLE
+import Data.Foldable (forM_, for_)
+import Data.Function ((&))
+import Data.Maybe (fromMaybe)
+import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import qualified Data.Text.Read as TR
+import System.ActionContract (ActionContext (..))
+import qualified System.ActionContract as Action
+import System.ConsequenceContract (Choice (..), Consequence (..))
+import qualified System.ConsequenceContract as Consequence
+import qualified System.Constants as C
+import qualified System.DiceContract as Dice
+import System.GameContextContract (BondCommand (..))
+import qualified System.GameContextContract as GameContext
+import qualified System.HelpContract as Help
+import qualified System.MoveContract as Move
+import qualified System.OracleContract as Oracle
+import qualified System.ProgressContract as Progress
 import System.Random (randomIO)
+import System.Tui.Comm
+  ( ChoiceSelectionPayload (..),
+    GameOutput (..),
+    MessageType (..),
+  )
+import qualified System.Util.Parser as Parser
 
 -- | Creates a new Action Service handle that orchestrates communication between
 -- game subsystems and the TUI. This service acts as the central coordinator,
@@ -47,16 +42,17 @@ newHandle :: Dice.Handle -> GameContext.Handle -> Move.Handle -> Progress.Handle
 newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler helpHandler tuiOutputChannel = do
   return actionHandle
   where
-    actionContext = ActionContext {
-      diceHandler = diceHandler,
-      contextHandler = contextHandler,
-      moveHandler = moveHandler,
-      progressHandler = progressHandler,
-      oracleHandler = oracleHandler,
-      helpHandler = helpHandler,
-      tuiOutputChannel = tuiOutputChannel
-    }
-    actionHandle = Action.Handle { Action.process = processAction actionContext }
+    actionContext =
+      ActionContext
+        { diceHandler = diceHandler,
+          contextHandler = contextHandler,
+          moveHandler = moveHandler,
+          progressHandler = progressHandler,
+          oracleHandler = oracleHandler,
+          helpHandler = helpHandler,
+          tuiOutputChannel = tuiOutputChannel
+        }
+    actionHandle = Action.Handle {Action.process = processAction actionContext}
     processAction aCtx actionType = case actionType of
       Action.AddStoryLog -> addStoryLog aCtx
       Action.RollDice -> rollDice aCtx actionHandle
@@ -86,21 +82,21 @@ newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler h
 -- Used exclusively for story events, dice rolls, oracle results, and move outcomes.
 -- These messages become part of the character's session history.
 logMessage :: ActionContext -> T.Text -> IO ()
-logMessage ActionContext { tuiOutputChannel } msg =
+logMessage ActionContext {tuiOutputChannel} msg =
   atomically $ writeTChan tuiOutputChannel (LogEntry msg NarrativeMessage)
 
 -- | Sends system notifications to the TUI.
 -- Used for error messages, status updates, help text, and other non-narrative communication.
 -- These messages are not stored in the session history.
 systemMessage :: ActionContext -> T.Text -> IO ()
-systemMessage ActionContext { tuiOutputChannel } msg =
+systemMessage ActionContext {tuiOutputChannel} msg =
   atomically $ writeTChan tuiOutputChannel (LogEntry msg SystemMessage)
 
 -- | Executes an action that requires a loaded character context.
 -- Displays an error message and returns True if no character is loaded.
 -- Otherwise executes the provided action with the current context.
 withContext :: ActionContext -> (GameContext.Context -> IO Bool) -> IO Bool
-withContext ActionContext { contextHandler } action = do
+withContext ActionContext {contextHandler} action = do
   maybeCtx <- GameContext.getCurrentContext contextHandler
   case maybeCtx of
     Nothing -> pure True
@@ -110,7 +106,7 @@ withContext ActionContext { contextHandler } action = do
 -- Does nothing silently if no context is loaded (no error message).
 -- Used for operations that should only run when a character is available.
 whenContext :: ActionContext -> (GameContext.Context -> IO ()) -> IO ()
-whenContext ActionContext { contextHandler } action = do
+whenContext ActionContext {contextHandler} action = do
   maybeCtx <- GameContext.getCurrentContext contextHandler
   for_ maybeCtx action
 
@@ -139,7 +135,7 @@ addStoryLog aCtx story = do
 --
 -- Example: rollDice ctx handle "2d6,1d10"
 rollDice :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-rollDice ActionContext { diceHandler } actionH diceDescription = do
+rollDice ActionContext {diceHandler} actionH diceDescription = do
   rolls <- Dice.roll diceHandler diceDescription
   let msg = C.msgDiceRolled C.messages <> T.pack (show rolls)
   _ <- Action.process actionH Action.AddStoryLog msg
@@ -159,7 +155,7 @@ showLogs aCtx _ = withContext aCtx $ \ctx -> do
 -- Sends a session end message and triggers TUI shutdown.
 -- Returns False to indicate the action loop should stop.
 exit :: ActionContext -> T.Text -> IO Bool
-exit aCtx@ActionContext { tuiOutputChannel } _ = do
+exit aCtx@ActionContext {tuiOutputChannel} _ = do
   systemMessage aCtx (C.msgSessionEnded C.messages)
   atomically $ writeTChan tuiOutputChannel GameEnd
   return False
@@ -168,11 +164,11 @@ exit aCtx@ActionContext { tuiOutputChannel } _ = do
 -- Input format: "CharacterName iron:3 edge:2 heart:2 shadow:1 wits:2"
 -- Missing attributes default to configured values. Updates TUI with character data.
 createCharacter :: ActionContext -> T.Text -> IO Bool
-createCharacter aCtx@ActionContext { contextHandler, tuiOutputChannel } input = do
+createCharacter aCtx@ActionContext {contextHandler, tuiOutputChannel} input = do
   let parts = T.words input
   case parts of
     [] -> systemMessage aCtx (C.msgCharacterNameRequired C.messages) >> return True
-    (charName:attrParts) -> do
+    (charName : attrParts) -> do
       let attrs = Parser.parseAttributes attrParts
       result <- GameContext.createContext contextHandler charName attrs
       either handleError handleSuccess result
@@ -190,7 +186,7 @@ createCharacter aCtx@ActionContext { contextHandler, tuiOutputChannel } input = 
 -- Restores character data, displays previous session logs, and updates TUI.
 -- Shows error message if character file cannot be found or loaded.
 loadCharacter :: ActionContext -> T.Text -> IO Bool
-loadCharacter aCtx@ActionContext { contextHandler, tuiOutputChannel } charName
+loadCharacter aCtx@ActionContext {contextHandler, tuiOutputChannel} charName
   | T.null charName = systemMessage aCtx (C.msgCharacterNameRequired C.messages) >> return True
   | otherwise = do
       result <- GameContext.loadContext contextHandler charName
@@ -211,7 +207,7 @@ loadCharacter aCtx@ActionContext { contextHandler, tuiOutputChannel } charName
 -- Updates the character display panel without adding log entries.
 -- Requires an active character context to function.
 showCharacter :: ActionContext -> T.Text -> IO Bool
-showCharacter aCtx@ActionContext { tuiOutputChannel } _ = withContext aCtx $ \ctx -> do
+showCharacter aCtx@ActionContext {tuiOutputChannel} _ = withContext aCtx $ \ctx -> do
   let char = GameContext.mainCharacter ctx
   atomically $ writeTChan tuiOutputChannel (CharacterUpdate char)
   return True
@@ -220,7 +216,7 @@ showCharacter aCtx@ActionContext { tuiOutputChannel } _ = withContext aCtx $ \ct
 -- Input format: "attribute:value" (e.g., "iron:3", "edge:2")
 -- Updates character sheet display and saves context automatically.
 updateAttribute :: ActionContext -> T.Text -> IO Bool
-updateAttribute aCtx@ActionContext { contextHandler, tuiOutputChannel } input = withContext aCtx $ \ctx -> do
+updateAttribute aCtx@ActionContext {contextHandler, tuiOutputChannel} input = withContext aCtx $ \ctx -> do
   let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
   maybe handleParseError (handleUpdate ctx) (Parser.parseAttributeUpdate input oldAttrs)
   where
@@ -237,7 +233,7 @@ updateAttribute aCtx@ActionContext { contextHandler, tuiOutputChannel } input = 
 -- Input format: "resource:value" (e.g., "health:4", "momentum:2")
 -- Updates character sheet display and saves context automatically.
 updateResource :: ActionContext -> T.Text -> IO Bool
-updateResource aCtx@ActionContext { contextHandler, tuiOutputChannel } input = withContext aCtx $ \ctx -> do
+updateResource aCtx@ActionContext {contextHandler, tuiOutputChannel} input = withContext aCtx $ \ctx -> do
   let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
   maybe handleParseError (handleUpdate ctx) (Parser.parseResourceUpdate input oldRes)
   where
@@ -254,7 +250,7 @@ updateResource aCtx@ActionContext { contextHandler, tuiOutputChannel } input = w
 -- Input format: "attribute:delta" (e.g., "iron:-1", "edge:+2")
 -- Supports both positive and negative modifications with automatic bounds checking.
 addAttribute :: ActionContext -> T.Text -> IO Bool
-addAttribute aCtx@ActionContext { contextHandler, tuiOutputChannel } input = withContext aCtx $ \ctx -> do
+addAttribute aCtx@ActionContext {contextHandler, tuiOutputChannel} input = withContext aCtx $ \ctx -> do
   let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
   maybe handleParseError (handleUpdate ctx) (Parser.parseAttributeAdd input oldAttrs)
   where
@@ -271,7 +267,7 @@ addAttribute aCtx@ActionContext { contextHandler, tuiOutputChannel } input = wit
 -- Input format: "resource:delta" (e.g., "health:-1", "momentum:+2")
 -- Applies resource-specific bounds (health/spirit/supply: 0-5, momentum: unbounded).
 addResource :: ActionContext -> T.Text -> IO Bool
-addResource aCtx@ActionContext { contextHandler, tuiOutputChannel } input = withContext aCtx $ \ctx -> do
+addResource aCtx@ActionContext {contextHandler, tuiOutputChannel} input = withContext aCtx $ \ctx -> do
   let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
   maybe handleParseError (handleUpdate ctx) (Parser.parseResourceAdd input oldRes)
   where
@@ -288,19 +284,21 @@ addResource aCtx@ActionContext { contextHandler, tuiOutputChannel } input = with
 -- Delegates dice rolling to DiceService and result formatting to DiceContract.
 -- Automatically evaluates Strong Hit/Weak Hit/Miss and handles matches.
 challenge :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-challenge aCtx@ActionContext { diceHandler } actionH _ = do
+challenge aCtx@ActionContext {diceHandler} actionH _ = do
   result <- Dice.challengeRoll diceHandler
   either handleError handleSuccess result
   where
     handleError err = systemMessage aCtx err >> return True
 
     handleSuccess challengeResult = do
-      let formattedMsg = Dice.formatChallengeResult challengeResult
-            (C.formatActionRoll C.characterDisplay)
-            (C.challengeStrongHit C.challengeInterpretation)
-            (C.challengeWeakHit C.challengeInterpretation)
-            (C.challengeMiss C.challengeInterpretation)
-            (C.challengeMatch C.challengeInterpretation)
+      let formattedMsg =
+            Dice.formatChallengeResult
+              challengeResult
+              (C.formatActionRoll C.characterDisplay)
+              (C.challengeStrongHit C.challengeInterpretation)
+              (C.challengeWeakHit C.challengeInterpretation)
+              (C.challengeMiss C.challengeInterpretation)
+              (C.challengeMatch C.challengeInterpretation)
       _ <- Action.process actionH Action.AddStoryLog formattedMsg
       return True
 
@@ -308,11 +306,11 @@ challenge aCtx@ActionContext { diceHandler } actionH _ = do
 -- Parses move name and parameters, delegates execution to MoveService,
 -- then processes all resulting consequences through the action system.
 moveAction :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-moveAction aCtx@ActionContext { moveHandler } actionH input = withContext aCtx $ \ctx -> do
+moveAction aCtx@ActionContext {moveHandler} actionH input = withContext aCtx $ \ctx -> do
   let parts = T.words input
   case parts of
     [] -> systemMessage aCtx (T.pack (C.msgMoveUsage C.helpMessages)) >> return True
-    (moveName:params) ->
+    (moveName : params) ->
       case Move.parseMoveType moveHandler moveName of
         Nothing -> do
           systemMessage aCtx $ "Move desconhecido: " <> T.unwords parts <> "\n" <> T.pack (C.msgMovesAvailable C.helpMessages)
@@ -330,75 +328,61 @@ moveAction aCtx@ActionContext { moveHandler } actionH input = withContext aCtx $
 -- Returns (Maybe Stat, remaining parameters as text).
 parseMoveParams :: Move.Handle -> [T.Text] -> (Maybe Move.Stat, T.Text)
 parseMoveParams _ [] = (Nothing, "")
-parseMoveParams moveHandler params@(first:rest) = (stat, text) where
-  stat = Move.parseStat moveHandler first
-  text = maybe (T.unwords params) (const (T.unwords rest)) stat
+parseMoveParams moveHandler params@(first : rest) = (stat, text)
+  where
+    stat = Move.parseStat moveHandler first
+    text = maybe (T.unwords params) (const (T.unwords rest)) stat
 
 -- | Processes a list of consequences from moves or oracle results.
 -- Applies each consequence sequentially, handling resource changes,
 -- triggered actions, player choices, and narrative elements.
 processConsequences :: ActionContext -> Action.Handle -> [Consequence] -> GameContext.Context -> IO ()
-processConsequences aCtx actionH consequences ctx = go consequences
-  where
-    go [] = pure ()
-    go (current:rest) = do
-      shouldPause <- processConsequence aCtx actionH ctx current rest
-      unless shouldPause (go rest)
+processConsequences _ _ [] _ = pure ()
+processConsequences aCtx actionH (current : rest) ctx = do
+  shouldPause <- processConsequence aCtx actionH ctx current rest
+  unless shouldPause (processConsequences aCtx actionH rest ctx)
 
 -- | Processes a single consequence using the recursive action architecture.
 -- Delegates resource changes and action triggers to Action.process for consistency.
 -- Handles narrative text, resource modifications, move chaining, and player choices.
 -- Returns True when execution should pause awaiting player input.
 processConsequence :: ActionContext -> Action.Handle -> GameContext.Context -> Consequence -> [Consequence] -> IO Bool
-processConsequence aCtx@ActionContext { contextHandler } actionH ctx cons remaining = case cons of
+processConsequence aCtx@ActionContext {contextHandler} actionH ctx cons remaining = case cons of
   Narrative text -> do
     void $ Action.process actionH Action.AddStoryLog text
     pure False
-
   LoseHealth amount ->
     applyResourceDelta aCtx actionH "health" (-amount) >> pure False
-
   LoseSpirit amount ->
     applyResourceDelta aCtx actionH "spirit" (-amount) >> pure False
-
   LoseSupply amount ->
     applyResourceDelta aCtx actionH "supply" (-amount) >> pure False
-
   LoseMomentum amount ->
     applyResourceDelta aCtx actionH "momentum" (-amount) >> pure False
-
   GainHealth amount ->
     applyResourceDelta aCtx actionH "health" amount >> pure False
-
   GainSpirit amount ->
     applyResourceDelta aCtx actionH "spirit" amount >> pure False
-
   GainSupply amount ->
     applyResourceDelta aCtx actionH "supply" amount >> pure False
-
   GainMomentum amount ->
     applyResourceDelta aCtx actionH "momentum" amount >> pure False
-
   TriggerMove nextMoveType -> do
     logMessage aCtx $ "\n>>> Executando " <> Consequence.moveTypeToText nextMoveType <> " automaticamente..."
     let nextMoveText = T.toLower (Consequence.moveTypeToText nextMoveType)
     _ <- Action.process actionH Action.Move nextMoveText
     return False
-
   TriggerOracle oracleName -> do
     logMessage aCtx $ "\n[*] Consultando oráculo " <> oracleName <> " automaticamente..."
     _ <- Action.process actionH Action.Oracle oracleName
     return False
-
   PlayerChoice choices ->
     presentPlayerChoice aCtx choices remaining >> return True
-
   AddBonus bonus -> do
     updatedCtx <- GameContext.addBonus contextHandler ctx bonus
     _ <- GameContext.saveContext contextHandler updatedCtx
     systemMessage aCtx $ "Bônus adicionado: " <> GameContext.bonusDescription bonus <> " (+" <> T.pack (show (GameContext.bonusValue bonus)) <> ")"
     return False
-
   MarkBondProgress -> do
     markBondProgressTrack aCtx actionH ctx
     return False
@@ -407,37 +391,15 @@ processConsequence aCtx@ActionContext { contextHandler } actionH ctx cons remain
 -- consequence chain (including remaining consequences) so the UI can forward
 -- the selection back through the input channel.
 presentPlayerChoice :: ActionContext -> [Choice] -> [Consequence] -> IO ()
-presentPlayerChoice aCtx@ActionContext { tuiOutputChannel } choices remaining = do
+presentPlayerChoice aCtx@ActionContext {tuiOutputChannel} choices remaining = do
   promptIdSeed <- randomIO :: IO Int
-  let promptId = T.pack $ "choice-" <> show (abs promptIdSeed)
-      options =
-        zipWith
-          (\idx Choice { choiceDescription, choiceConsequences } ->
-             ChoiceOptionPayload
-               { choiceOptionIndex = idx
-               , choiceOptionLabel = choiceDescription
-               , choiceOptionConsequences = encodeConsequencesToText (choiceConsequences ++ remaining)
-               })
-          [1 ..]
-          choices
-      payload =
-        ChoicePromptPayload
-          { choicePromptId = promptId
-          , choicePromptTitle = "Escolha uma opção"
-          , choicePromptMessage = "Use ↑/↓ ou números para navegar. Enter confirma, ESC cancela."
-          , choicePromptOptions = options
-          }
+  let payload = Parser.buildChoicePromptPayload promptIdSeed choices remaining
   atomically $ writeTChan tuiOutputChannel (ChoicePrompt payload)
   systemMessage aCtx "Escolha uma opção para continuar o movimento."
 
--- | Encodes a consequence list to a JSON Text representation.
-encodeConsequencesToText :: [Consequence] -> T.Text
-encodeConsequencesToText =
-  TL.toStrict . TLE.decodeUtf8 . Aeson.encode
-
 -- | Handles the command that resolves a pending player choice sent from the TUI.
 resolveChoice :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-resolveChoice aCtx@ActionContext { contextHandler } actionH rawInput =
+resolveChoice aCtx@ActionContext {contextHandler} actionH rawInput =
   case Aeson.eitherDecodeStrict (TE.encodeUtf8 rawInput) of
     Left err -> do
       systemMessage aCtx $ "Erro ao interpretar escolha: " <> T.pack err
@@ -456,7 +418,8 @@ resolveChoice aCtx@ActionContext { contextHandler } actionH rawInput =
             Just ctx -> do
               let desc = choiceSelectionLabel selection
               unless (T.null desc) $
-                logMessage aCtx $ "\nVocê escolheu: " <> desc
+                logMessage aCtx $
+                  "\nVocê escolheu: " <> desc
               processConsequences aCtx actionH (choiceSelectionConsequences selection) ctx
               return True
 
@@ -464,11 +427,11 @@ resolveChoice aCtx@ActionContext { contextHandler } actionH rawInput =
 -- Creates the bonds track if it doesn't exist (rank doesn't matter for bonds track).
 -- Marks 1 tick (¼ box) as per Ironsworn rules.
 markBondProgressTrack :: ActionContext -> Action.Handle -> GameContext.Context -> IO ()
-markBondProgressTrack aCtx@ActionContext { contextHandler, progressHandler } _actionH _ctx = do
+markBondProgressTrack aCtx@ActionContext {contextHandler, progressHandler} _actionH _ctx = do
   -- Always get the current context from MVar to ensure we have the latest state
   maybeCurrentCtx <- GameContext.getCurrentContext contextHandler
   case maybeCurrentCtx of
-    Nothing -> return ()  -- No context loaded, can't mark progress
+    Nothing -> return () -- No context loaded, can't mark progress
     Just currentCtx -> do
       let bondTrackName = "Bonds"
       let maybeTrack = GameContext.getProgressTrack contextHandler currentCtx bondTrackName
@@ -483,9 +446,10 @@ markBondProgressTrack aCtx@ActionContext { contextHandler, progressHandler } _ac
       updatedTrack <- Progress.markProgressTicks progressHandler track 1
 
       -- Add track if it was just created, otherwise update it
-      updatedCtx <- if wasCreated
-        then GameContext.addProgressTrack contextHandler currentCtx updatedTrack
-        else GameContext.updateProgressTrack contextHandler currentCtx bondTrackName updatedTrack
+      updatedCtx <-
+        if wasCreated
+          then GameContext.addProgressTrack contextHandler currentCtx updatedTrack
+          else GameContext.updateProgressTrack contextHandler currentCtx bondTrackName updatedTrack
 
       _ <- GameContext.saveContext contextHandler updatedCtx
 
@@ -499,10 +463,11 @@ markBondProgressTrack aCtx@ActionContext { contextHandler, progressHandler } _ac
 applyResourceDelta :: ActionContext -> Action.Handle -> T.Text -> Int -> IO ()
 applyResourceDelta _aCtx actionH resourceName delta = do
   let command = resourceName <> ":" <> deltaText
-  void (Action.process actionH Action.AddResource command) where
-  deltaText
-    | delta >= 0 ="+" <> T.pack (show delta)
-    | otherwise = T.pack (show delta)
+  void (Action.process actionH Action.AddResource command)
+  where
+    deltaText
+      | delta >= 0 = "+" <> T.pack (show delta)
+      | otherwise = T.pack (show delta)
 
 -- | Queries oracle systems with optional specific values.
 -- Empty input lists available oracles. Named input triggers random roll.
@@ -519,7 +484,7 @@ oracleQuery aCtx actionH input = do
         then rollOracleRandomly aCtx actionH oracleName
         else rollOracleWithGivenValue aCtx actionH oracleName maybeValue
 
-    listOracles ActionContext { oracleHandler } = do
+    listOracles ActionContext {oracleHandler} = do
       oracles <- Oracle.listOracles oracleHandler
       if null oracles
         then systemMessage aCtx "Nenhum oráculo carregado."
@@ -532,17 +497,22 @@ oracleQuery aCtx actionH input = do
 -- Formats the oracle response and delegates log creation to Action.process.
 -- Automatically executes any structured consequences from the oracle result.
 rollOracleRandomly :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-rollOracleRandomly aCtx@ActionContext { oracleHandler } actionH oracleName = do
+rollOracleRandomly aCtx@ActionContext {oracleHandler} actionH oracleName = do
   result <- Oracle.rollOracle oracleHandler oracleName
   case result of
     Left err -> do
       systemMessage aCtx $ "Erro no oráculo: " <> T.pack (show err)
       return True
     Right oracleResult -> do
-      let formattedResult = T.pack $
-            "[*] Oráculo: " ++ T.unpack (Oracle.resultOracle oracleResult) ++
-            " (Rolou " ++ show (Oracle.resultRoll oracleResult) ++ "):\n" ++
-            "-> " ++ T.unpack (Oracle.resultText oracleResult)
+      let formattedResult =
+            T.pack $
+              "[*] Oráculo: "
+                ++ T.unpack (Oracle.resultOracle oracleResult)
+                ++ " (Rolou "
+                ++ show (Oracle.resultRoll oracleResult)
+                ++ "):\n"
+                ++ "-> "
+                ++ T.unpack (Oracle.resultText oracleResult)
 
       _ <- Action.process actionH Action.AddStoryLog formattedResult
       executeOracleConsequences aCtx actionH oracleResult
@@ -552,7 +522,7 @@ rollOracleRandomly aCtx@ActionContext { oracleHandler } actionH oracleName = do
 -- Parses the numeric value and performs direct oracle lookup.
 -- Formats result and delegates log creation to Action.process.
 rollOracleWithGivenValue :: ActionContext -> Action.Handle -> T.Text -> T.Text -> IO Bool
-rollOracleWithGivenValue aCtx@ActionContext { oracleHandler } actionH oracleName valueText = do
+rollOracleWithGivenValue aCtx@ActionContext {oracleHandler} actionH oracleName valueText = do
   case TR.decimal valueText of
     Right (val, _) -> do
       result <- Oracle.queryOracle oracleHandler oracleName val
@@ -561,10 +531,15 @@ rollOracleWithGivenValue aCtx@ActionContext { oracleHandler } actionH oracleName
           systemMessage aCtx $ "Erro no oráculo: " <> T.pack (show err)
           return True
         Right oracleResult -> do
-          let formattedResult = T.pack $
-                "[*] Oráculo: " ++ T.unpack (Oracle.resultOracle oracleResult) ++
-                " (Índice " ++ show (Oracle.resultRoll oracleResult) ++ "):\n" ++
-                "-> " ++ T.unpack (Oracle.resultText oracleResult)
+          let formattedResult =
+                T.pack $
+                  "[*] Oráculo: "
+                    ++ T.unpack (Oracle.resultOracle oracleResult)
+                    ++ " (Índice "
+                    ++ show (Oracle.resultRoll oracleResult)
+                    ++ "):\n"
+                    ++ "-> "
+                    ++ T.unpack (Oracle.resultText oracleResult)
 
           _ <- Action.process actionH Action.AddStoryLog formattedResult
           executeOracleConsequences aCtx actionH oracleResult
@@ -577,7 +552,7 @@ rollOracleWithGivenValue aCtx@ActionContext { oracleHandler } actionH oracleName
 -- Processes any consequence chains that may result from oracle queries,
 -- maintaining consistency with the move consequence system.
 executeOracleConsequences :: ActionContext -> Action.Handle -> Oracle.OracleResult -> IO ()
-executeOracleConsequences aCtx@ActionContext { contextHandler } actionH result = do
+executeOracleConsequences aCtx@ActionContext {contextHandler} actionH result = do
   let structuredConsequences = Oracle.resultConsequences result
   unless (null structuredConsequences) $ do
     maybeCtx <- GameContext.getCurrentContext contextHandler
@@ -588,7 +563,7 @@ executeOracleConsequences aCtx@ActionContext { contextHandler } actionH result =
 -- Shows general help when no topic specified, or specific topic help.
 -- All help text is sent as system messages, not narrative entries.
 helpCommand :: ActionContext -> T.Text -> IO Bool
-helpCommand aCtx@ActionContext { helpHandler } input = do
+helpCommand aCtx@ActionContext {helpHandler} input = do
   let topic = T.strip input
   if T.null topic
     then do
@@ -607,7 +582,7 @@ helpCommand aCtx@ActionContext { helpHandler } input = do
 -- Input format: "Vow Name" rank (e.g., "Avenge my father" dangerous)
 -- Delegates log creation to Action.process following recursive architecture.
 swearVow :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-swearVow aCtx@ActionContext { contextHandler } actionH input = withContext aCtx $ \ctx -> do
+swearVow aCtx@ActionContext {contextHandler} actionH input = withContext aCtx $ \ctx -> do
   maybe handleParseError (processVow ctx) (Parser.parseQuotedString input)
   where
     handleParseError = systemMessage aCtx (T.pack (C.msgVowUsage C.moveMessages)) >> return True
@@ -629,7 +604,7 @@ swearVow aCtx@ActionContext { contextHandler } actionH input = withContext aCtx 
 -- Adds progress ticks based on the track's difficulty rank.
 -- Creates narrative log entry showing current progress status.
 markProgress :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-markProgress aCtx@ActionContext { contextHandler, progressHandler } actionH input = withContext aCtx $ \ctx -> do
+markProgress aCtx@ActionContext {contextHandler, progressHandler} actionH input = withContext aCtx $ \ctx -> do
   let trackName = T.strip input
   case nonEmpty trackName of
     Nothing -> systemMessage aCtx (T.pack (C.msgProgressUsage C.moveMessages)) >> return True
@@ -647,9 +622,14 @@ markProgress aCtx@ActionContext { contextHandler, progressHandler } actionH inpu
           _ <- GameContext.saveContext contextHandler updatedCtx
           let boxes = Progress.getProgressScore updatedTrack
           let ticks = Progress.trackTicks updatedTrack
-          let msg = "[+] Progresso marcado: " <> name <>
-                   " (" <> T.pack (show boxes) <> "/10 boxes, " <>
-                   T.pack (show ticks) <> "/40 ticks)"
+          let msg =
+                "[+] Progresso marcado: "
+                  <> name
+                  <> " ("
+                  <> T.pack (show boxes)
+                  <> "/10 boxes, "
+                  <> T.pack (show ticks)
+                  <> "/40 ticks)"
           _ <- Action.process actionH Action.AddStoryLog msg
           return True
 
@@ -659,7 +639,7 @@ markProgress aCtx@ActionContext { contextHandler, progressHandler } actionH inpu
 -- Performs 2d10 vs progress score, handles completion, experience gain,
 -- and track state changes. Delegates formatting to ProgressService.
 rollProgress :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-rollProgress aCtx@ActionContext { contextHandler, progressHandler } actionH input = withContext aCtx $ \ctx -> do
+rollProgress aCtx@ActionContext {contextHandler, progressHandler} actionH input = withContext aCtx $ \ctx -> do
   let trackName = T.strip input
   case nonEmpty trackName of
     Nothing -> systemMessage aCtx "Uso: :fulfill \"<nome do track>\"" >> return True
@@ -708,7 +688,7 @@ showTracks aCtx _ = withContext aCtx $ \ctx -> do
 -- Equivalent to "Forsake Your Vow" in Ironsworn terminology.
 -- Creates narrative log entry about the abandoned track.
 abandonTrack :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-abandonTrack aCtx@ActionContext { contextHandler } actionH input = withContext aCtx $ \ctx -> do
+abandonTrack aCtx@ActionContext {contextHandler} actionH input = withContext aCtx $ \ctx -> do
   let trackName = T.strip input
   case nonEmpty trackName of
     Nothing -> systemMessage aCtx "Uso: :abandon \"<nome do track>\"" >> return True
@@ -732,17 +712,17 @@ abandonTrack aCtx@ActionContext { contextHandler } actionH input = withContext a
 -- All bond operations update the character context and provide system feedback.
 -- Adding a bond also marks progress on the bonds track (as per Ironsworn rules).
 bondCommand :: ActionContext -> Action.Handle -> T.Text -> IO Bool
-bondCommand aCtx@ActionContext { contextHandler } _ input = do
-  _ <- processBondCommand maybeValidCommand >>= log aCtx maybeValidCommand
-  return True where
+bondCommand aCtx@ActionContext {contextHandler} _ input = do
+  _ <- processBondCommand maybeValidCommand >>= logCommandResponse maybeValidCommand
+  return True
+  where
+    maybeValidCommand = Parser.parseBondCommand input
 
-  maybeValidCommand = Parser.parseBondCommand input
+    processBondCommand Nothing = pure $ Left GameContext.InvalidCommand
+    processBondCommand (Just validCommand) = (contextHandler & GameContext.processBondCommand) validCommand
 
-  processBondCommand Nothing = pure $ Left GameContext.InvalidCommand
-  processBondCommand (Just validCommand) = (contextHandler&GameContext.processBondCommand) validCommand
-
-  log :: ActionContext -> Maybe GameContext.BondCommand -> Either GameContext.ContextError GameContext.BondProcessingResponse -> IO ()
-  log aCtx (Just GameContext.BondCommand { bondCommandType = (GameContext.UpdateBondNotes _) }) (Right r) = logMessage aCtx (r&GameContext.systemMessage)
-  log aCtx _ (Left (GameContext.FileError msg)) = systemMessage aCtx $ "Erro ao processar comando de bond: " <> T.pack msg
-  log aCtx _ (Left _) = systemMessage aCtx "Erro desconhecido ao processar comando de bond."
-  log aCtx _ (Right r) = systemMessage aCtx (r&GameContext.systemMessage)
+    logCommandResponse :: Maybe GameContext.BondCommand -> Either GameContext.ContextError GameContext.BondProcessingResponse -> IO ()
+    logCommandResponse (Just GameContext.BondCommand {bondCommandType = (GameContext.UpdateBondNotes _)}) (Right r) = logMessage aCtx (r & GameContext.systemMessage)
+    logCommandResponse _ (Left (GameContext.FileError msg)) = systemMessage aCtx $ "Erro ao processar comando de bond: " <> T.pack msg
+    logCommandResponse _ (Left _) = systemMessage aCtx "Erro desconhecido ao processar comando de bond."
+    logCommandResponse _ (Right r) = systemMessage aCtx (r & GameContext.systemMessage)

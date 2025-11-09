@@ -1,13 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
+
 module MainLoop (runGameLoop) where
 
 import Control.Concurrent.STM (TChan, readTChan)
 import Control.Monad.STM (atomically)
+import Data.Char (toLower)
 import qualified Data.Text as T
 import qualified System.ActionContract as Action
-import System.Tui.Comm (GameOutput)
 import System.Exit (exitSuccess)
-import Data.Char (toLower)
+import System.Tui.Comm (GameOutput)
 
 runGameLoop :: Action.Handle -> TChan T.Text -> TChan GameOutput -> IO ()
 runGameLoop actionHandler inputChan _ = do
@@ -25,11 +26,11 @@ runGameLoop actionHandler inputChan _ = do
 parseCommand :: T.Text -> (Action.ActionType, T.Text)
 parseCommand input =
   let text = T.strip input
-  in if T.isPrefixOf ":" text
-     then
-       let (cmd, params) = T.breakOn " " text
-       in (parseActionType (T.map toLower cmd), T.strip params)
-     else (Action.AddStoryLog, text)
+   in if T.isPrefixOf ":" text
+        then
+          let (cmd, params) = T.breakOn " " text
+           in (parseActionType (T.map toLower cmd), T.strip params)
+        else (Action.AddStoryLog, text)
 
 parseActionType :: T.Text -> Action.ActionType
 parseActionType cmd = case cmd of

@@ -1,47 +1,59 @@
+{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
-{- | Módulo de funções utilitárias para parsing de texto.
 
-     Este módulo contém funções auxiliares para parsear diferentes formatos
-     de entrada de texto, como atributos, recursos, valores numéricos, etc.
--}
+-- | Módulo de funções utilitárias para parsing de texto.
+--
+--     Este módulo contém funções auxiliares para parsear diferentes formatos
+--     de entrada de texto, como atributos, recursos, valores numéricos, etc.
 module System.Util.Parser
   ( -- * Parsing de atributos
-    parseAttributes
-  , parseAttributeUpdate
-  , parseAttributeAdd
+    parseAttributes,
+    parseAttributeUpdate,
+    parseAttributeAdd,
 
-  -- * Parsing de recursos
-  , parseResourceUpdate
-  , parseResourceAdd
+    -- * Parsing de recursos
+    parseResourceUpdate,
+    parseResourceAdd,
 
-  -- * Parsing de progress tracks
-  , parseRank
-  , rankToText
+    -- * Parsing de progress tracks
+    parseRank,
+    rankToText,
 
-  -- * Parsing genérico
-  , parseKeyValue
-  , parseDecimal
-  , parseSignedDecimal
-  , parseQuotedString
-  , parseOracleQuery
-  , formatProgressTrack
-  , formatProgressRollResult
+    -- * Parsing genérico
+    parseKeyValue,
+    parseDecimal,
+    parseSignedDecimal,
+    parseQuotedString,
+    parseOracleQuery,
+    formatProgressTrack,
+    formatProgressRollResult,
+    buildChoicePromptPayload,
+    encodeConsequencesToText,
 
-  -- * Parsing de vínculos
-  , parseBondCommand
-  -- * Funções auxiliares
-  , clamp
-  ) where
+    -- * Parsing de vínculos
+    parseBondCommand,
 
-import qualified System.GameContextContract as GameContext
-import qualified System.ProgressContract as Progress
-import qualified System.DiceContract as Dice
-import qualified System.Constants as C
-import qualified Data.Text as T
-import qualified Data.Text.Read as TR
+    -- * Funções auxiliares
+    clamp,
+  )
+where
+
+import qualified Data.Aeson as Aeson
 import Data.Char (isSpace)
 import Data.Maybe (fromMaybe)
-
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Encoding as TLE
+import qualified Data.Text.Read as TR
+import qualified System.ConsequenceContract as Consequence
+import qualified System.Constants as C
+import qualified System.DiceContract as Dice
+import qualified System.GameContextContract as GameContext
+import qualified System.ProgressContract as Progress
+import System.Tui.Comm
+  ( ChoiceOptionPayload (..),
+    ChoicePromptPayload (..),
+  )
 
 formatProgressTrack :: Progress.ProgressTrack -> T.Text
 formatProgressTrack track =
@@ -56,7 +68,7 @@ formatProgressTrack track =
       ticks = Progress.trackTicks track
       percentage = Progress.progressPercentage track
       completed = Progress.trackCompleted track
-  in T.pack $ C.formatProgressTrack C.moveMessages name pType (T.unpack rank) boxes ticks percentage completed
+   in T.pack $ C.formatProgressTrack C.moveMessages name pType (T.unpack rank) boxes ticks percentage completed
 
 formatProgressRollResult :: Progress.ProgressRollResult -> Progress.ProgressType -> T.Text
 formatProgressRollResult result pType =
@@ -85,12 +97,47 @@ formatProgressRollResult result pType =
         (Progress.Journey, Dice.Miss) -> C.journeyMiss C.progressInterpretation
         _ -> ""
 
-      header = "\n=== Progress Roll ===\n" <>
-               "Progress Score: " <> T.pack (show score) <> "\n" <>
-               "Challenge Dice: " <> T.pack (show ch1) <> ", " <> T.pack (show ch2) <> "\n" <>
-               "Resultado: " <> T.pack resultMsg <> matchMsg <> "\n"
+      header =
+        "\n=== Progress Roll ===\n"
+          <> "Progress Score: "
+          <> T.pack (show score)
+          <> "\n"
+          <> "Challenge Dice: "
+          <> T.pack (show ch1)
+          <> ", "
+          <> T.pack (show ch2)
+          <> "\n"
+          <> "Resultado: "
+          <> T.pack resultMsg
+          <> matchMsg
+          <> "\n"
+   in header <> T.pack interpretation
 
-  in header <> T.pack interpretation
+buildChoicePromptPayload :: Int -> [Consequence.Choice] -> [Consequence.Consequence] -> ChoicePromptPayload
+buildChoicePromptPayload promptIdSeed choices remaining =
+  ChoicePromptPayload
+    { choicePromptId = promptId,
+      choicePromptTitle = "Escolha uma opção",
+      choicePromptMessage = "Use ↑/↓ ou números para navegar. Enter confirma, ESC cancela.",
+      choicePromptOptions = options
+    }
+  where
+    promptId = T.pack $ "choice-" <> show (abs promptIdSeed)
+    options =
+      zipWith
+        ( \idx Consequence.Choice {Consequence.choiceDescription, Consequence.choiceConsequences} ->
+            ChoiceOptionPayload
+              { choiceOptionIndex = idx,
+                choiceOptionLabel = choiceDescription,
+                choiceOptionConsequences = encodeConsequencesToText (choiceConsequences ++ remaining)
+              }
+        )
+        [1 ..]
+        choices
+
+encodeConsequencesToText :: [Consequence.Consequence] -> T.Text
+encodeConsequencesToText =
+  TL.toStrict . TLE.decodeUtf8 . Aeson.encode
 
 -- | Parse atributos de uma lista de textos (ex: ["iron:3", "edge:2"])
 parseAttributes :: [T.Text] -> GameContext.Attributes
@@ -99,19 +146,22 @@ parseAttributes parts =
       defaultAttrs = GameContext.Attributes defVal defVal defVal defVal defVal
       updateAttr attr key val =
         case key of
-          "iron" -> attr { GameContext.iron = val }
-          "edge" -> attr { GameContext.edge = val }
-          "heart" -> attr { GameContext.heart = val }
-          "shadow" -> attr { GameContext.shadow = val }
-          "wits" -> attr { GameContext.wits = val }
+          "iron" -> attr {GameContext.iron = val}
+          "edge" -> attr {GameContext.edge = val}
+          "heart" -> attr {GameContext.heart = val}
+          "shadow" -> attr {GameContext.shadow = val}
+          "wits" -> attr {GameContext.wits = val}
           _ -> attr
-  in foldl (\acc part ->
-        case T.splitOn ":" part of
-          [k, v] -> case TR.decimal v of
-            Right (n, _) -> updateAttr acc k n
-            _ -> acc
-          _ -> acc
-      ) defaultAttrs parts
+   in foldl
+        ( \acc part ->
+            case T.splitOn ":" part of
+              [k, v] -> case TR.decimal v of
+                Right (n, _) -> updateAttr acc k n
+                _ -> acc
+              _ -> acc
+        )
+        defaultAttrs
+        parts
 
 -- | Parse atualização de atributo
 parseAttributeUpdate :: T.Text -> GameContext.Attributes -> Maybe GameContext.Attributes
@@ -119,12 +169,12 @@ parseAttributeUpdate input attrs = do
   (key, valStr) <- parseKeyValue input
   n <- parseDecimal valStr
   case key of
-    "iron"   -> Just $ attrs { GameContext.iron = n }
-    "edge"   -> Just $ attrs { GameContext.edge = n }
-    "heart"  -> Just $ attrs { GameContext.heart = n }
-    "shadow" -> Just $ attrs { GameContext.shadow = n }
-    "wits"   -> Just $ attrs { GameContext.wits = n }
-    _        -> Nothing
+    "iron" -> Just $ attrs {GameContext.iron = n}
+    "edge" -> Just $ attrs {GameContext.edge = n}
+    "heart" -> Just $ attrs {GameContext.heart = n}
+    "shadow" -> Just $ attrs {GameContext.shadow = n}
+    "wits" -> Just $ attrs {GameContext.wits = n}
+    _ -> Nothing
 
 -- | Parse adição/remoção de atributo (delta com valores negativos)
 parseAttributeAdd :: T.Text -> GameContext.Attributes -> Maybe GameContext.Attributes
@@ -132,12 +182,12 @@ parseAttributeAdd input attrs = do
   (key, valStr) <- parseKeyValue input
   delta <- parseSignedDecimal valStr
   case key of
-    "iron"   -> Just $ attrs { GameContext.iron = GameContext.iron attrs + delta }
-    "edge"   -> Just $ attrs { GameContext.edge = GameContext.edge attrs + delta }
-    "heart"  -> Just $ attrs { GameContext.heart = GameContext.heart attrs + delta }
-    "shadow" -> Just $ attrs { GameContext.shadow = GameContext.shadow attrs + delta }
-    "wits"   -> Just $ attrs { GameContext.wits = GameContext.wits attrs + delta }
-    _        -> Nothing
+    "iron" -> Just $ attrs {GameContext.iron = GameContext.iron attrs + delta}
+    "edge" -> Just $ attrs {GameContext.edge = GameContext.edge attrs + delta}
+    "heart" -> Just $ attrs {GameContext.heart = GameContext.heart attrs + delta}
+    "shadow" -> Just $ attrs {GameContext.shadow = GameContext.shadow attrs + delta}
+    "wits" -> Just $ attrs {GameContext.wits = GameContext.wits attrs + delta}
+    _ -> Nothing
 
 -- | Parse definição de recurso (apenas define valor absoluto)
 parseResourceUpdate :: T.Text -> GameContext.Resources -> Maybe GameContext.Resources
@@ -145,12 +195,12 @@ parseResourceUpdate input res = do
   (key, valStr) <- parseKeyValue input
   n <- parseDecimal valStr
   case key of
-    "spirit"     -> Just $ res { GameContext.spirit = n }
-    "health"     -> Just $ res { GameContext.health = n }
-    "supply"     -> Just $ res { GameContext.supply = n }
-    "momentum"   -> Just $ res { GameContext.momentum = n }
-    "experience" -> Just $ res { GameContext.experience = n }
-    _            -> Nothing
+    "spirit" -> Just $ res {GameContext.spirit = n}
+    "health" -> Just $ res {GameContext.health = n}
+    "supply" -> Just $ res {GameContext.supply = n}
+    "momentum" -> Just $ res {GameContext.momentum = n}
+    "experience" -> Just $ res {GameContext.experience = n}
+    _ -> Nothing
 
 -- | Parse adição/remoção de recurso (delta com valores negativos)
 parseResourceAdd :: T.Text -> GameContext.Resources -> Maybe GameContext.Resources
@@ -158,12 +208,12 @@ parseResourceAdd input res = do
   (key, valStr) <- parseKeyValue input
   delta <- parseSignedDecimal valStr
   case key of
-    "spirit"     -> Just $ res { GameContext.spirit     = clamp 0 5 (GameContext.spirit res + delta) }
-    "health"     -> Just $ res { GameContext.health     = clamp 0 5 (GameContext.health res + delta) }
-    "supply"     -> Just $ res { GameContext.supply     = clamp 0 5 (GameContext.supply res + delta) }
-    "momentum"   -> Just $ res { GameContext.momentum   = GameContext.momentum res + delta }
-    "experience" -> Just $ res { GameContext.experience = max 0 (GameContext.experience res + delta) }
-    _            -> Nothing
+    "spirit" -> Just $ res {GameContext.spirit = clamp 0 5 (GameContext.spirit res + delta)}
+    "health" -> Just $ res {GameContext.health = clamp 0 5 (GameContext.health res + delta)}
+    "supply" -> Just $ res {GameContext.supply = clamp 0 5 (GameContext.supply res + delta)}
+    "momentum" -> Just $ res {GameContext.momentum = GameContext.momentum res + delta}
+    "experience" -> Just $ res {GameContext.experience = max 0 (GameContext.experience res + delta)}
+    _ -> Nothing
 
 parseBondCommand :: T.Text -> Maybe GameContext.BondCommand
 parseBondCommand input =
@@ -172,15 +222,15 @@ parseBondCommand input =
       Just $ GameContext.BondCommand GameContext.ListBonds emptyBond
     [single] ->
       let name = stripQuotes single
-          bond = emptyBond { GameContext.bondName = name }
-      in Just $ GameContext.BondCommand (GameContext.ListBondNotes name) bond
-    (token:_) ->
+          bond = emptyBond {GameContext.bondName = name}
+       in Just $ GameContext.BondCommand (GameContext.ListBondNotes name) bond
+    (token : _) ->
       let lowerToken = T.toLower token
-      in case lowerToken of
-           "add"    -> buildAddCommand GameContext.AddBond GameContext.PersonBond argsText
-           "addc"   -> buildAddCommand GameContext.AddCommunityBond GameContext.CommunityBond argsText
-           "remove" -> buildRemoveCommand argsText
-           _        -> buildUpdateCommand trimmedInput
+       in case lowerToken of
+            "add" -> buildAddCommand GameContext.AddBond GameContext.PersonBond argsText
+            "addc" -> buildAddCommand GameContext.AddCommunityBond GameContext.CommunityBond argsText
+            "remove" -> buildRemoveCommand argsText
+            _ -> buildUpdateCommand trimmedInput
   where
     trimmedInput = T.strip input
     tokens = T.words trimmedInput
@@ -188,33 +238,33 @@ parseBondCommand input =
 
     emptyBond =
       GameContext.Bond
-        { GameContext.bondName = ""
-        , GameContext.bondType = GameContext.Undefined
-        , GameContext.bondNotes = ""
+        { GameContext.bondName = "",
+          GameContext.bondType = GameContext.Undefined,
+          GameContext.bondNotes = ""
         }
 
     buildAddCommand cmd bondType text = do
       (name, notes) <- parseNameAndNotes text
       let bond =
             GameContext.Bond
-              { GameContext.bondName = name
-              , GameContext.bondType = bondType
-              , GameContext.bondNotes = notes
+              { GameContext.bondName = name,
+                GameContext.bondType = bondType,
+                GameContext.bondNotes = notes
               }
       Just $ GameContext.BondCommand cmd bond
 
     buildRemoveCommand text = do
       (name, _) <- parseNameAndNotes text
-      let bond = emptyBond { GameContext.bondName = name }
+      let bond = emptyBond {GameContext.bondName = name}
       Just $ GameContext.BondCommand GameContext.RemoveBond bond
 
     buildUpdateCommand text = do
       (name, notes) <- parseNameAndNotes text
       let bond =
             GameContext.Bond
-              { GameContext.bondName = name
-              , GameContext.bondType = GameContext.Undefined
-              , GameContext.bondNotes = notes
+              { GameContext.bondName = name,
+                GameContext.bondType = GameContext.Undefined,
+                GameContext.bondNotes = notes
               }
       Just $ GameContext.BondCommand (GameContext.UpdateBondNotes name) bond
 
@@ -223,23 +273,23 @@ parseBondCommand input =
       | T.isPrefixOf "\"" trimmed =
           case separateStrings trimmed of
             [] -> Nothing
-            (nameSegment:rest) ->
+            (nameSegment : rest) ->
               let notes = cleanNote (T.unwords rest)
-              in Just (nameSegment, notes)
+               in Just (nameSegment, notes)
       | otherwise =
           case T.words trimmed of
             [] -> Nothing
-            (nameToken:restTokens) ->
+            (nameToken : restTokens) ->
               let name = stripQuotes nameToken
                   notes = cleanNote (T.unwords restTokens)
-              in Just (name, notes)
+               in Just (name, notes)
       where
         trimmed = T.strip raw
 
     dropFirstToken txt =
       let stripped = T.stripStart txt
           (_, rest) = T.break isSpace stripped
-      in T.stripStart rest
+       in T.stripStart rest
 
     stripQuotes txt =
       fromMaybe stripped (T.stripPrefix "\"" stripped >>= T.stripSuffix "\"")
@@ -251,20 +301,20 @@ parseBondCommand input =
 -- Função que separa strings entre aspas duplas usando Text
 separateStrings :: T.Text -> [T.Text]
 separateStrings texto = case T.uncons texto of
-    Nothing -> []
-    Just ('"', resto) ->
-        let (str, resto') = T.break (== '"') resto
-        in if T.null resto'
-           then [str]  -- Caso não tenha aspas de fechamento
-           else str : separateStrings (T.tail resto')
-    Just (_, resto) -> separateStrings resto
+  Nothing -> []
+  Just ('"', resto) ->
+    let (str, resto') = T.break (== '"') resto
+     in if T.null resto'
+          then [str] -- Caso não tenha aspas de fechamento
+          else str : separateStrings (T.tail resto')
+  Just (_, resto) -> separateStrings resto
 
 -- | Funções auxiliares de parsing
 parseKeyValue :: T.Text -> Maybe (T.Text, T.Text)
 parseKeyValue input =
   case T.splitOn ":" input of
     [k, v] -> Just (k, v)
-    _      -> Nothing
+    _ -> Nothing
 
 parseDecimal :: T.Text -> Maybe Int
 parseDecimal valStr =
@@ -290,8 +340,9 @@ parseQuotedString input =
     Nothing -> Nothing
     Just afterFirstQuote ->
       case T.breakOn "\"" afterFirstQuote of
-        (content, rest) | not (T.null rest) ->
-          Just (content, T.drop 1 rest)  -- Remove a segunda aspa
+        (content, rest)
+          | not (T.null rest) ->
+              Just (content, T.drop 1 rest) -- Remove a segunda aspa
         _ -> Nothing
 
 -- | Parse query de oráculo
@@ -302,9 +353,9 @@ parseOracleQuery input =
     Just (name, rest) -> (name, T.strip rest)
     Nothing ->
       let parts = T.words input
-      in if null parts
-         then ("", "")
-         else (head parts, T.unwords (tail parts))
+       in if null parts
+            then ("", "")
+            else (head parts, T.unwords (tail parts))
 
 -- | Parse ChallengeRank de texto
 parseRank :: T.Text -> Maybe Progress.ChallengeRank
@@ -325,4 +376,3 @@ rankToText Progress.Dangerous = "dangerous"
 rankToText Progress.Formidable = "formidable"
 rankToText Progress.Extreme = "extreme"
 rankToText Progress.Epic = "epic"
-
