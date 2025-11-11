@@ -11,9 +11,8 @@ module System.Util.SafeIO
 
 import qualified Data.ByteString.Lazy as BL
 import Control.Concurrent.MVar (MVar, newMVar, withMVar, takeMVar, putMVar)
-import Control.Exception (bracket, catch, SomeException)
+import Control.Exception (catch, SomeException)
 import System.IO.Unsafe (unsafePerformIO)
-import System.IO (withFile, IOMode(..), hClose)
 import qualified Data.Map.Strict as Map
 
 -- | Global map of file locks

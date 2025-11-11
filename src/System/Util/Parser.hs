@@ -26,12 +26,14 @@ module System.Util.Parser
     parseQuotedString,
     parseOracleQuery,
     formatProgressTrack,
-    formatProgressRollResult,
     buildChoicePromptPayload,
     encodeConsequencesToText,
 
     -- * Parsing de vínculos
     parseBondCommand,
+
+    -- * Parsing de bônus
+    parseBonusCommand,
 
     -- * Funções auxiliares
     clamp,
@@ -47,9 +49,8 @@ import qualified Data.Text.Lazy.Encoding as TLE
 import qualified Data.Text.Read as TR
 import qualified System.ConsequenceContract as Consequence
 import qualified System.Constants as C
-import qualified System.DiceContract as Dice
-import qualified System.GameContextContract as GameContext
-import qualified System.ProgressContract as Progress
+import qualified System.GameContext as GameContext
+import qualified System.Progress as Progress
 import System.Tui.Comm
   ( ChoiceOptionPayload (..),
     ChoicePromptPayload (..),
@@ -69,49 +70,6 @@ formatProgressTrack track =
       percentage = Progress.progressPercentage track
       completed = Progress.trackCompleted track
    in T.pack $ C.formatProgressTrack C.moveMessages name pType (T.unpack rank) boxes ticks percentage completed
-
-formatProgressRollResult :: Progress.ProgressRollResult -> Progress.ProgressType -> T.Text
-formatProgressRollResult result pType =
-  let score = Progress.progressScore result
-      (ch1, ch2) = Progress.progressChallengeDice result
-      rollResult = Progress.progressRollResult result
-      hasMatch = Progress.progressMatch result
-
-      resultMsg = case rollResult of
-        Dice.StrongHit -> "[+] STRONG HIT"
-        Dice.WeakHit -> "[~] WEAK HIT"
-        Dice.Miss -> "[X] MISS"
-        Dice.InvalidRoll -> "INVALID"
-
-      matchMsg = if hasMatch then "\n[!] MATCH!" else ""
-
-      interpretation = case (pType, rollResult) of
-        (Progress.Vow, Dice.StrongHit) -> C.vowStrongHit C.progressInterpretation
-        (Progress.Vow, Dice.WeakHit) -> C.vowWeakHit C.progressInterpretation
-        (Progress.Vow, Dice.Miss) -> C.vowMiss C.progressInterpretation
-        (Progress.Combat, Dice.StrongHit) -> C.combatStrongHit C.progressInterpretation
-        (Progress.Combat, Dice.WeakHit) -> C.combatWeakHit C.progressInterpretation
-        (Progress.Combat, Dice.Miss) -> C.combatMiss C.progressInterpretation
-        (Progress.Journey, Dice.StrongHit) -> C.journeyStrongHit C.progressInterpretation
-        (Progress.Journey, Dice.WeakHit) -> C.journeyWeakHit C.progressInterpretation
-        (Progress.Journey, Dice.Miss) -> C.journeyMiss C.progressInterpretation
-        _ -> ""
-
-      header =
-        "\n=== Progress Roll ===\n"
-          <> "Progress Score: "
-          <> T.pack (show score)
-          <> "\n"
-          <> "Challenge Dice: "
-          <> T.pack (show ch1)
-          <> ", "
-          <> T.pack (show ch2)
-          <> "\n"
-          <> "Resultado: "
-          <> T.pack resultMsg
-          <> matchMsg
-          <> "\n"
-   in header <> T.pack interpretation
 
 buildChoicePromptPayload :: Int -> [Consequence.Choice] -> [Consequence.Consequence] -> ChoicePromptPayload
 buildChoicePromptPayload promptIdSeed choices remaining =
@@ -376,3 +334,44 @@ rankToText Progress.Dangerous = "dangerous"
 rankToText Progress.Formidable = "formidable"
 rankToText Progress.Extreme = "extreme"
 rankToText Progress.Epic = "epic"
+
+-- | Parse de comando de bônus
+-- Formato: <tipo> <valor> [descrição]
+-- Tipos: nextroll, nextmove:<nome>, persistent
+-- Exemplo: "nextroll +1 \"Preparado\""
+--          "nextmove:FaceDanger +2 \"Vantagem\""
+--          "persistent +1 \"Bônus permanente\""
+parseBonusCommand :: T.Text -> Maybe GameContext.ActiveBonus
+parseBonusCommand input = do
+  let parts = T.words input
+  if null parts
+    then Nothing
+    else do
+      let bonusTypeStr = T.toLower (head parts)
+      bonusType <- parseBonusType bonusTypeStr
+      if length parts < 2
+        then Nothing
+        else do
+          let valueStr = parts !! 1
+          value <- parseBonusValue valueStr
+          let description = if length parts > 2
+                            then T.unwords (drop 2 parts)
+                            else T.pack $ case bonusType of
+                                  GameContext.NextRoll -> "Bônus na próxima rolagem"
+                                  GameContext.NextMove _ -> "Bônus no próximo move"
+                                  GameContext.Persistent -> "Bônus permanente"
+          Just $ GameContext.ActiveBonus bonusType value description
+  where
+    parseBonusType :: T.Text -> Maybe GameContext.BonusType
+    parseBonusType txt
+      | txt == "nextroll" = Just GameContext.NextRoll
+      | txt == "persistent" = Just GameContext.Persistent
+      | T.isPrefixOf "nextmove:" txt = 
+          let moveName = T.drop (T.length "nextmove:") txt
+          in Just (GameContext.NextMove moveName)
+      | otherwise = Nothing
+    
+    parseBonusValue :: T.Text -> Maybe Int
+    parseBonusValue txt = case TR.signed TR.decimal txt of
+      Right (val, _) -> Just val
+      Left _ -> Nothing

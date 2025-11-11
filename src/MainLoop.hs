@@ -6,18 +6,18 @@ import Control.Concurrent.STM (TChan, readTChan)
 import Control.Monad.STM (atomically)
 import Data.Char (toLower)
 import qualified Data.Text as T
-import qualified System.ActionContract as Action
+import qualified System.Action as Action
 import System.Exit (exitSuccess)
 import System.Tui.Comm (GameOutput)
 
-runGameLoop :: Action.Handle -> TChan T.Text -> TChan GameOutput -> IO ()
-runGameLoop actionHandler inputChan _ = do
+runGameLoop :: TChan GameOutput -> TChan T.Text -> IO ()
+runGameLoop outputChan inputChan = do
   -- Game loop
   let loop = do
         input <- atomically $ readTChan inputChan
         let (action, params) = parseCommand input
 
-        continue <- Action.process actionHandler action params
+        continue <- Action.process outputChan action params
         if continue
           then loop
           else exitSuccess -- Or send a GameEnd message
@@ -50,6 +50,7 @@ parseActionType cmd = case cmd of
   ":challenge" -> Action.Challenge
   ":move" -> Action.Move
   ":vow" -> Action.SwearVow
+  ":combat" -> Action.CreateCombatTrack
   ":progress" -> Action.MarkProgress
   ":fulfill" -> Action.RollProgress
   ":tracks" -> Action.ShowTracks
@@ -57,5 +58,6 @@ parseActionType cmd = case cmd of
   ":oracle" -> Action.Oracle
   ":help" -> Action.Help
   ":bond" -> Action.Bond
+  ":bonus" -> Action.AddBonusManually
   ":choice" -> Action.ResolveChoice
   _ -> Action.Unknown

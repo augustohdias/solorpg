@@ -2,13 +2,7 @@ module Main (main) where
 
 import UI (runTui)
 import MainLoop (runGameLoop)
-import qualified System.Impl.DiceService as DiceService
-import qualified System.Impl.GameContextService as GameContextService
-import qualified System.Impl.ActionService as ActionService
-import qualified System.Impl.MoveService as MoveService
-import qualified System.Impl.ProgressService as ProgressService
-import qualified System.Impl.OracleService as OracleService
-import qualified System.Impl.HelpService as HelpService
+import qualified System.Oracle as Oracle
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
@@ -21,17 +15,11 @@ main = do
   inputChan <- newTChanIO :: IO (TChan T.Text)
   outputChan <- newTChanIO :: IO (TChan GameOutput)
 
-  -- Initialize handles
-  diceHandler <- DiceService.newHandle
-  contextHandler <- GameContextService.newHandle
-  progressHandler <- ProgressService.newHandle diceHandler
-  oracleHandler <- OracleService.newHandle "oracles" diceHandler
-  helpHandler <- HelpService.newHandle "help"
-  moveHandler <- MoveService.newHandle diceHandler
-  actionHandler <- ActionService.newHandle diceHandler contextHandler moveHandler progressHandler oracleHandler helpHandler outputChan
+  -- Initialize oracles (they use global cache)
+  Oracle.initializeOracles "oracles"
 
   -- Fork the game loop thread
-  _ <- forkIO $ runGameLoop actionHandler inputChan outputChan
+  _ <- forkIO $ runGameLoop outputChan inputChan
 
   -- Run the TUI on the main thread
   runTui inputChan outputChan

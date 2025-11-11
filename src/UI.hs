@@ -27,7 +27,7 @@ import qualified Graphics.Vty as Vty
 import Lens.Micro (Lens')
 import qualified System.ConsequenceContract as Consequence
 import System.Console.ANSI
-import qualified System.GameContextContract as GameContext
+import qualified System.GameContext as GameContext
 import System.Tui.Comm
   ( ChoiceOptionPayload (..),
     ChoicePromptPayload (..),

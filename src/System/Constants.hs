@@ -276,6 +276,7 @@ data MoveMessages = MoveMessages
   , msgTrackRemoved :: T.Text
   , msgTrackNotFound :: T.Text
   , msgVowUsage :: String
+  , msgCombatTrackUsage :: String
   , msgProgressUsage :: String
   , msgNoTracksActive :: String
   , msgTracksHeader :: String
@@ -292,6 +293,7 @@ data MoveMessages = MoveMessages
   , formatOracleRoll :: T.Text -> Int -> T.Text -> String
   , formatOracleIndex :: T.Text -> Int -> T.Text -> String
   , formatVowCreated :: T.Text -> String -> Int -> String
+  , formatCombatTrackCreated :: T.Text -> String -> Int -> String
   , formatProgressTrack :: T.Text -> String -> String -> Int -> Int -> Double -> Bool -> String
   , formatOracleComplete :: T.Text -> T.Text -> T.Text -> [(Int, Int, T.Text)] -> String
   , msgUndertakeJourney :: String
@@ -313,6 +315,9 @@ moveMessages = MoveMessages
   , msgVowUsage = "Uso: :vow \"<nome>\" <rank>\n\
                   \Ranks: troublesome, dangerous, formidable, extreme, epic\n\
                   \Exemplo: :vow \"Vingar meu pai\" dangerous"
+  , msgCombatTrackUsage = "Uso: :combat \"<nome do inimigo>\" <rank>\n\
+                          \Ranks: troublesome, dangerous, formidable, extreme, epic\n\
+                          \Exemplo: :combat \"Lobo Perigoso\" dangerous"
   , msgProgressUsage = "Use :tracks para ver tracks ativos"
   , msgNoTracksActive = "\nNenhum progress track ativo."
   , msgTracksHeader = "\n=== Progress Tracks Ativos ==="
@@ -343,6 +348,11 @@ moveMessages = MoveMessages
   , formatVowCreated = \name rank ticks -> unlines
       [ ""
       , "[+] Voto criado: " ++ T.unpack name ++ " (" ++ rank ++ ")"
+      , "  Progresso por mark: " ++ show ticks ++ " ticks"
+      ]
+  , formatCombatTrackCreated = \name rank ticks -> unlines
+      [ ""
+      , "[+] Combat Track criado: " ++ T.unpack name ++ " (" ++ rank ++ ")"
       , "  Progresso por mark: " ++ show ticks ++ " ticks"
       ]
   , formatProgressTrack = \name pType rank boxes ticks percentage completed ->

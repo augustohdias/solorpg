@@ -1,47 +1,193 @@
 SOLORPG - AJUDA GERAL
+Sistema Solo RPG baseado em Ironsworn
 
-COMANDOS:
-Texto sem ":" = entrada narrativa
-:help [tópico] - ajuda
-:exit/:q/:quit - sair
-:show - log completo
+═══════════════════════════════════════════════════════════════
+COMANDOS BÁSICOS
+═══════════════════════════════════════════════════════════════
 
-PERSONAGEM:
-:create <nome> - cria
-:load <nome> - carrega
-:char - mostra ficha
-:setattr <attr>:<val> - define atributo
-:setres <rec>:<val> - define recurso
-:addattr <attr>:<delta> - modifica atributo
-:addres <rec>:<delta> - modifica recurso
+ENTRADA NARRATIVA:
+  Texto sem ":" = adiciona entrada narrativa ao log da sessão
+  Exemplo: "Você entra na taverna escura."
 
-DADOS:
-:r <espec> - rola dados (ex: :r 2d6,1d10)
-:challenge - rola desafio
+COMANDOS DO SISTEMA:
+  :help [tópico]     - Mostra ajuda geral ou de um tópico específico
+                      Tópicos: moves, progress, oracle, chaining, character
+  :exit / :q / :quit - Encerra a sessão
+  :show              - Mostra o log completo da sessão
 
-MOVES:
-:move <nome> [stat] - executa move
-:vow <nome> <rank> - cria voto
-:progress <nome> <n> - marca progresso
-:fulfill <nome> - completa track
-:tracks - lista tracks
-:abandon <nome> - abandona track
+═══════════════════════════════════════════════════════════════
+PERSONAGEM
+═══════════════════════════════════════════════════════════════
 
-ORÁCULOS:
-:oracle <nome> - consulta
+CRIAR E CARREGAR:
+  :create <nome> [atributos]  - Cria novo personagem
+                                Exemplo: :create Eivor iron:3 edge:2 heart:4
+  :load <nome>                 - Carrega personagem existente
+  :char                        - Mostra ficha do personagem atual
 
-VÍNCULOS:
-:bond - lista
-:bond add <nome> - adiciona pessoa
-:bond addplace <nome> - adiciona lugar
-:bond addcomm <nome> - adiciona comunidade
-:bond note "<nome>" "<nota>" - adiciona nota (append)
-:bond remove <nome> - remove
+ATRIBUTOS (1-5):
+  Iron, Edge, Heart, Shadow, Wits
 
-NAVEGAÇÃO:
-Tab - alterna foco scroll
-↑↓ - rola viewport focado
-PgUp/PgDn - rola em páginas
-ESC/Ctrl+C - sair
+  :setattr <attr>:<val>  - Define valor absoluto
+                          Exemplo: :setattr iron:3
+  :addattr <attr>:<delta> - Modifica por delta (+/-)
+                           Exemplo: :addattr iron:-1, :addattr edge:+2
 
-TÓPICOS: moves, progress, oracle, chaining, character
+RECURSOS:
+  Health (0-5), Spirit (0-5), Supply (0-5), Momentum (-6 a +10), XP (0+)
+
+  :setres <rec>:<val>  - Define valor absoluto
+                        Exemplo: :setres health:5
+  :addres <rec>:<delta> - Modifica por delta (+/-)
+                          Exemplo: :addres supply:-2, :addres momentum:+1
+
+VÍNCULOS (BONDS):
+  :bond                      - Lista todos os vínculos
+  :bond add <nome>           - Adiciona vínculo com pessoa
+  :bond addplace <nome>      - Adiciona vínculo com lugar
+  :bond addcomm <nome>       - Adiciona vínculo com comunidade
+  :bond note "<nome>" "<nota>" - Adiciona nota a um vínculo (append)
+  :bond remove <nome>        - Remove um vínculo
+  :bond list "<nome>"        - Lista notas de um vínculo
+
+BÔNUS DE ROLAGEM:
+  :bonus <tipo> <valor> [descrição]  - Adiciona bônus de rolagem
+  
+  Tipos disponíveis:
+    nextroll              - Aplica na próxima rolagem qualquer
+    nextmove:<nome>        - Aplica no próximo move específico
+    persistent             - Bônus permanente (até removido)
+  
+  Exemplos:
+    :bonus nextroll +1 "Preparado"
+    :bonus nextmove:FaceDanger +2 "Vantagem"
+    :bonus persistent +1 "Bônus permanente"
+
+═══════════════════════════════════════════════════════════════
+DADOS E ROLAGENS
+═══════════════════════════════════════════════════════════════
+
+ROLAGEM DE DADOS:
+  :r <espec> / :roll <espec>  - Rola dados
+                                Exemplo: :r 2d6,1d10 ou :roll 3d6
+
+DESAFIO (IRONSWORN):
+  :challenge  - Rola desafio Ironsworn (1d6 + 2d10)
+               Avalia Strong Hit, Weak Hit ou Miss
+
+═══════════════════════════════════════════════════════════════
+MOVES (IRONSWORN)
+═══════════════════════════════════════════════════════════════
+
+EXECUTAR MOVE:
+  :move <nome> [stat]  - Executa um move de Ironsworn
+                         Stat é opcional (sistema detecta automaticamente)
+                         Exemplos:
+                           :move Face Danger edge
+                           :move Gather Information wits
+                           :move Strike
+                           :move Pay The Price
+
+MOVES DISPONÍVEIS:
+  Adventure: Face Danger, Gather Information, Secure Advantage, 
+             Heal, Resupply, Make Camp, Swear Iron Vow, 
+             Undertake Journey, Reach Milestone
+  
+  Combat: Enter the Fray, Strike, Clash, Turn the Tide, End the Fight
+  
+  Suffer: Endure Harm, Face Death, Endure Stress, Face Desolation
+  
+  Bond: Forge a Bond, Test Your Bond, Aid Your Ally
+  
+  Social: Compel, Sojourn
+  
+  Fate: Pay The Price, Ask The Oracle
+
+RESULTADOS:
+  Strong Hit - Sucesso completo
+  Weak Hit   - Sucesso parcial
+  Miss       - Falha, consequências aplicadas
+
+Consequências automáticas são aplicadas ao executar moves.
+
+═══════════════════════════════════════════════════════════════
+PROGRESSO (PROGRESS TRACKS)
+═══════════════════════════════════════════════════════════════
+
+VOTOS (VOWS):
+  :vow "<nome>" <rank>  - Cria um voto (progress track)
+                          Ranks: Troublesome, Dangerous, Formidable, 
+                                 Extreme, Epic
+                          Exemplo: :vow "Derrotar o dragão" Dangerous
+
+COMBATE:
+  :combat "<nome>" <rank>  - Cria um progress track de combate
+                             Ranks: Troublesome, Dangerous, Formidable,
+                                    Extreme, Epic
+                             Exemplo: :combat "Lobo Perigoso" Dangerous
+
+MARCAR PROGRESSO:
+  :progress "<nome>"  - Marca 1 tick de progresso no track
+                        Exemplo: :progress "Derrotar o dragão"
+
+COMPLETAR TRACK:
+  :fulfill "<nome>"  - Faz progress roll para completar o track
+                      Ganha XP baseado no rank do track
+
+GERENCIAR TRACKS:
+  :tracks            - Lista todos os tracks ativos
+  :abandon "<nome>"  - Abandona e remove um track
+
+═══════════════════════════════════════════════════════════════
+ORÁCULOS
+═══════════════════════════════════════════════════════════════
+
+CONSULTAR ORÁCULO:
+  :oracle                    - Lista todos os oráculos disponíveis
+  :oracle <nome>             - Consulta oráculo com rolagem automática
+                              Exemplo: :oracle PayThePrice
+  :oracle <nome> <valor>    - Consulta oráculo com valor específico
+                              Exemplo: :oracle PayThePrice 42
+
+Oráculos podem ter consequências programáticas que são aplicadas
+automaticamente ao consultá-los.
+
+═══════════════════════════════════════════════════════════════
+NAVEGAÇÃO E INTERFACE
+═══════════════════════════════════════════════════════════════
+
+TECLAS:
+  Tab          - Alterna foco entre áreas de scroll
+  ↑↓           - Rola viewport focado
+  PgUp/PgDn    - Rola em páginas
+  ESC/Ctrl+C   - Sair
+
+ESCOLHAS DO JOGADOR:
+  Quando um move apresenta escolhas, use as teclas:
+  ↑↓ ou 1-9    - Seleciona opção
+  Enter         - Confirma escolha
+  ESC           - Cancela escolha
+
+═══════════════════════════════════════════════════════════════
+SALVAMENTO
+═══════════════════════════════════════════════════════════════
+
+O contexto do personagem é salvo automaticamente quando você:
+  - Modifica atributos ou recursos
+  - Adiciona entrada narrativa ao log
+  - Executa moves ou consulta oráculos
+  - Gerencia progress tracks ou bonds
+
+═══════════════════════════════════════════════════════════════
+TÓPICOS DE AJUDA DISPONÍVEIS
+═══════════════════════════════════════════════════════════════
+
+Use :help <tópico> para mais informações:
+
+  moves      - Lista completa de moves e como usá-los
+  progress   - Sistema de progress tracks e votos
+  oracle     - Como usar oráculos
+  chaining   - Encadeamento de consequências e escolhas
+  character  - Gerenciamento completo de personagem
+
+═══════════════════════════════════════════════════════════════

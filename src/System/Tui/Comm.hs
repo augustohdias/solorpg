@@ -9,7 +9,7 @@ module System.Tui.Comm
   ) where
 
 import qualified Data.Text as T
-import qualified System.GameContextContract as GameContext
+import qualified System.GameContext as GameContext
 import qualified System.ConsequenceContract as Consequence
 import GHC.Generics (Generic)
 import Data.Aeson (ToJSON, FromJSON)
