@@ -1,68 +1,69 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
+
 module UI (runTui) where
 
 import Brick
 import Brick.BChan (newBChan, writeBChan)
-import Brick.Widgets.Border
-import Brick.Widgets.Center (hCenter, vCenter, centerLayer)
-import qualified Brick.Widgets.Edit as Ed
 import qualified Brick.Focus as F
-import qualified Graphics.Vty as Vty
-import qualified Data.Text as T
-import qualified Data.Vector as Vec
-import qualified Data.Aeson as Aeson
-import Data.Text.Zipper (clearZipper)
+import Brick.Widgets.Border
+import Brick.Widgets.Center (centerLayer, hCenter, vCenter)
+import qualified Brick.Widgets.Edit as Ed
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
 import Control.Monad (forever, void)
-import Data.List (intersperse, find)
-import Data.Char (isDigit, digitToInt)
+import Control.Monad.IO.Class (liftIO)
+import qualified Data.Aeson as Aeson
+import Data.Char (digitToInt, isDigit)
+import Data.List (find, intersperse)
 import Data.Maybe (fromMaybe, mapMaybe)
+import qualified Data.Text as T
+import qualified Data.Text.Encoding as TE
 import qualified Data.Text.Lazy as TL
 import qualified Data.Text.Lazy.Encoding as TLE
-import qualified Data.Text.Encoding as TE
-import System.Tui.Comm
-  ( GameOutput(..)
-  , MessageType(..)
-  , ChoicePromptPayload(..)
-  , ChoiceOptionPayload(..)
-  , ChoiceSelectionPayload(..)
-  )
-import qualified System.GameContextContract as GameContext
-import Control.Monad.IO.Class (liftIO)
+import Data.Text.Zipper (clearZipper)
+import qualified Data.Vector as Vec
+import qualified Graphics.Vty as Vty
 import Lens.Micro (Lens')
-import System.Console.ANSI
 import qualified System.ConsequenceContract as Consequence
+import System.Console.ANSI
+import qualified System.GameContextContract as GameContext
+import System.Tui.Comm
+  ( ChoiceOptionPayload (..),
+    ChoicePromptPayload (..),
+    ChoiceSelectionPayload (..),
+    GameOutput (..),
+    MessageType (..),
+  )
 
 -- Widget names
 data Name = InputField | LogViewport | SystemViewport | ChoicePopup deriving (Eq, Ord, Show)
 
 -- | Holds decoded information for an individual choice option.
 data ChoiceOptionState = ChoiceOptionState
-  { optionPayload :: ChoiceOptionPayload
-  , optionConsequences :: [Consequence.Consequence]
-  , optionDisabled :: Bool
-  , optionError :: Maybe T.Text
+  { optionPayload :: ChoiceOptionPayload,
+    optionConsequences :: [Consequence.Consequence],
+    optionDisabled :: Bool,
+    optionError :: Maybe T.Text
   }
 
 -- | Represents the popup currently shown to the player.
 data ChoicePromptState = ChoicePromptState
-  { choiceStatePayload :: ChoicePromptPayload
-  , choiceStateOptions :: Vec.Vector ChoiceOptionState
-  , choiceStateSelected :: Int
-  , choiceStateError :: Maybe T.Text
+  { choiceStatePayload :: ChoicePromptPayload,
+    choiceStateOptions :: Vec.Vector ChoiceOptionState,
+    choiceStateSelected :: Int,
+    choiceStateError :: Maybe T.Text
   }
 
 -- TUI State
 data TuiState = TuiState
-  { editor :: Ed.Editor T.Text Name
-  , logs :: Vec.Vector T.Text           -- Narrative and game logs
-  , systemMessages :: Vec.Vector T.Text -- System notifications
-  , character :: Maybe GameContext.MainCharacter
-  , inputChan :: TChan T.Text -- Channel to send commands to the game loop
-  , viewportFocus :: F.FocusRing Name -- Focus ring for viewport scrolling
-  , activeChoice :: Maybe ChoicePromptState -- Popup prompting the user
+  { editor :: Ed.Editor T.Text Name,
+    logs :: Vec.Vector T.Text, -- Narrative and game logs
+    systemMessages :: Vec.Vector T.Text, -- System notifications
+    character :: Maybe GameContext.MainCharacter,
+    inputChan :: TChan T.Text, -- Channel to send commands to the game loop
+    viewportFocus :: F.FocusRing Name, -- Focus ring for viewport scrolling
+    activeChoice :: Maybe ChoicePromptState -- Popup prompting the user
   }
 
 choiceSelectedAttr, choiceDisabledAttr :: AttrName
@@ -71,31 +72,34 @@ choiceDisabledAttr = attrName "choiceDisabled"
 
 -- Brick App definition
 app :: App TuiState GameOutput Name
-app = App
-  { appDraw = drawTui
-  , appChooseCursor = showFirstCursor
-  , appHandleEvent = handleEvent
-  , appStartEvent = return ()
-  , appAttrMap = const $
-      attrMap
-        Vty.defAttr
-        [ (choiceSelectedAttr, Vty.defAttr `Vty.withStyle` Vty.reverseVideo)
-        , (choiceDisabledAttr, Vty.defAttr `Vty.withForeColor` Vty.brightBlack)
-        ]
-  }
+app =
+  App
+    { appDraw = drawTui,
+      appChooseCursor = showFirstCursor,
+      appHandleEvent = handleEvent,
+      appStartEvent = return (),
+      appAttrMap =
+        const $
+          attrMap
+            Vty.defAttr
+            [ (choiceSelectedAttr, Vty.defAttr `Vty.withStyle` Vty.reverseVideo),
+              (choiceDisabledAttr, Vty.defAttr `Vty.withForeColor` Vty.brightBlack)
+            ]
+    }
 
 -- Main entry point
 runTui :: TChan T.Text -> TChan GameOutput -> IO ()
 runTui inputChan' outputChan = do
-  let initialState = TuiState
-        { editor = Ed.editor InputField (Just 1) ""
-        , logs = Vec.empty
-        , systemMessages = Vec.empty
-        , character = Nothing
-        , inputChan = inputChan'
-        , viewportFocus = F.focusRing [LogViewport, SystemViewport] -- Start with LogViewport focused
-        , activeChoice = Nothing
-        }
+  let initialState =
+        TuiState
+          { editor = Ed.editor InputField (Just 1) "",
+            logs = Vec.empty,
+            systemMessages = Vec.empty,
+            character = Nothing,
+            inputChan = inputChan',
+            viewportFocus = F.focusRing [LogViewport, SystemViewport], -- Start with LogViewport focused
+            activeChoice = Nothing
+          }
 
   eventChan <- newBChan 10
 
@@ -113,7 +117,7 @@ runTui inputChan' outputChan = do
   -- This ensures the UI stays in sync even if events are missed
   -- Runs continuously but silently (no logs generated)
   void . forkIO . forever $ do
-    threadDelay 2000000  -- 2 seconds
+    threadDelay 2000000 -- 2 seconds
     -- Send update request (won't spam logs since showCharacter doesn't log)
     atomically $ writeTChan inputChan' ":char"
 
@@ -137,18 +141,26 @@ drawTui ts =
     Nothing -> [baseUi]
     Just choiceState -> [renderChoicePopup choiceState, baseUi]
   where
-    baseUi = vBox [ header, mainContent, inputBox ]
+    baseUi = vBox [header, mainContent, inputBox]
     header = drawHeader (character ts) (viewportFocus ts)
-    mainContent = hBox [ charSheet, logPanel, systemPanel ]
+    mainContent = hBox [leftPanel, logPanel, systemPanel]
+    leftPanel = vBox [charSheet, cardsSheet]
+    cardsSheet = hLimit charSheetWidth $ borderWithLabel (str " Cartas ") $ padAll 1 $ drawCards (character ts)
     charSheet = hLimit charSheetWidth $ borderWithLabel (str " Personagem ") $ padAll 1 $ drawCharacter (character ts)
     -- Log panel with word wrapping for long paragraphs
     -- Add spacing between log entries for better readability
-    logPanel = withVScrollBars OnRight $ viewport LogViewport Vertical $
-               vBox (intersperse (str " ") (map txtWrap (Vec.toList $ logs ts)))
+    logPanel =
+      withVScrollBars OnRight $
+        viewport LogViewport Vertical $
+          vBox (intersperse (str " ") (map txtWrap (Vec.toList $ logs ts)))
     -- System panel on the right side, similar to Character block
-    systemPanel = hLimit systemSheetWidth $ borderWithLabel (str " Sistema ") $ padAll 1 $
-                  withVScrollBars OnRight $ viewport SystemViewport Vertical $
-                  drawSystemMessages (systemMessages ts)
+    systemPanel =
+      hLimit systemSheetWidth $
+        borderWithLabel (str " Sistema ") $
+          padAll 1 $
+            withVScrollBars OnRight $
+              viewport SystemViewport Vertical $
+                drawSystemMessages (systemMessages ts)
     inputBox = border $ vLimit 1 $ Ed.renderEditor (txt . T.concat) True (editor ts)
 
 renderChoicePopup :: ChoicePromptState -> Widget Name
@@ -157,17 +169,17 @@ renderChoicePopup choiceState =
     borderWithLabel (txtWrap $ choicePromptTitle payload) $
       padAll 1 $
         vBox $
-          [ txtWrap (choicePromptMessage payload)
-          , str " "
+          [ txtWrap (choicePromptMessage payload),
+            str " "
           ]
-          ++ optionWidgets
-          ++ errorWidgets
+            ++ optionWidgets
+            ++ errorWidgets
   where
     payload = choiceStatePayload choiceState
     options = choiceStateOptions choiceState
     optionWidgets
       | Vec.null options =
-          [ withAttr choiceDisabledAttr $ txtWrap "Nenhuma opção disponível." ]
+          [withAttr choiceDisabledAttr $ txtWrap "Nenhuma opção disponível."]
       | otherwise = concatMap renderOption $ zip [0 ..] (Vec.toList options)
 
     renderOption (idx, opt) =
@@ -183,7 +195,7 @@ renderChoicePopup choiceState =
               []
               (\err -> [padLeft (Pad 4) $ withAttr choiceDisabledAttr (txtWrap err)])
               (optionError opt)
-      in styledWidget : errorWidget
+       in styledWidget : errorWidget
 
     errorWidgets =
       maybe [] (\err -> [str " ", withAttr choiceDisabledAttr (txtWrap err)]) (choiceStateError choiceState)
@@ -196,74 +208,80 @@ drawHeader _ focusRing =
         Just SystemViewport -> "Sistema"
         _ -> "Nenhum"
       instruction = "Aperte <Tab> para mudar o foco do scroll | Foco atual: " ++ focusIndicator
-  in hCenter $ str instruction
+   in hCenter $ str instruction
 
 -- Draw system messages with word wrap and spacing
 drawSystemMessages :: Vec.Vector T.Text -> Widget Name
 drawSystemMessages msgs =
   let msgList = Vec.toList msgs
-  in if null msgList
-     then str "Nenhuma mensagem por enquanto."
-     else vBox (intersperse (str " ") (map txtWrap msgList))
+   in if null msgList
+        then str "Nenhuma mensagem por enquanto."
+        else vBox (intersperse (str " ") (map txtWrap msgList))
+
+-- Draw cards list
+drawCards :: Maybe GameContext.MainCharacter -> Widget Name
+drawCards Nothing = hCenter $ vCenter $ str "Você ainda não cartas disponíveis."
+drawCards _ = vBox $ map buildCardDisplay placeholder
+  where
+    placeholder = ["Carta 1", "Carta 2", "Carta 3"]
+    buildCardDisplay cardData = vBox [hCenter $ str $ T.unpack cardData]
 
 -- Draw character sheet
 drawCharacter :: Maybe GameContext.MainCharacter -> Widget Name
 drawCharacter Nothing = hCenter $ vCenter $ str "Sem personagem\ncarregado.\n\nDigite :help para ver\nas opções."
 drawCharacter (Just charData) =
-  vBox [ hCenter $ str $ T.unpack (GameContext.name charData)
-       , hCenter $ str " "
-       , str "Attributes"
-       , padLeft (Pad 2) $ drawAttrs (GameContext.attributes charData)
-       , str " "
-       , str "Resources"
-       , padLeft (Pad 2) $ drawResources (GameContext.resources charData)
-       ]
+  vBox
+    [ hCenter $ str $ T.unpack (GameContext.name charData),
+      hCenter $ str " ",
+      str "Attributes",
+      padLeft (Pad 2) $ drawAttrs (GameContext.attributes charData),
+      str " ",
+      str "Resources",
+      padLeft (Pad 2) $ drawResources (GameContext.resources charData)
+    ]
 
 drawAttrs :: GameContext.Attributes -> Widget Name
-drawAttrs attrs = vBox
-  [ str $ "Iron:   " ++ show (GameContext.iron attrs)
-  , str $ "Edge:   " ++ show (GameContext.edge attrs)
-  , str $ "Heart:  " ++ show (GameContext.heart attrs)
-  , str $ "Shadow: " ++ show (GameContext.shadow attrs)
-  , str $ "Wits:   " ++ show (GameContext.wits attrs)
-  ]
+drawAttrs attrs =
+  vBox
+    [ str $ "Iron:   " ++ show (GameContext.iron attrs),
+      str $ "Edge:   " ++ show (GameContext.edge attrs),
+      str $ "Heart:  " ++ show (GameContext.heart attrs),
+      str $ "Shadow: " ++ show (GameContext.shadow attrs),
+      str $ "Wits:   " ++ show (GameContext.wits attrs)
+    ]
 
 drawResources :: GameContext.Resources -> Widget Name
-drawResources res = vBox
-  [ str $ "Health:   " ++ show (GameContext.health res)
-  , str $ "Spirit:   " ++ show (GameContext.spirit res)
-  , str $ "Supply:   " ++ show (GameContext.supply res)
-  , str $ "Momentum: " ++ show (GameContext.momentum res)
-  , str $ "EXP:      " ++ show (GameContext.experience res)
-  ]
+drawResources res =
+  vBox
+    [ str $ "Health:   " ++ show (GameContext.health res),
+      str $ "Spirit:   " ++ show (GameContext.spirit res),
+      str $ "Supply:   " ++ show (GameContext.supply res),
+      str $ "Momentum: " ++ show (GameContext.momentum res),
+      str $ "EXP:      " ++ show (GameContext.experience res)
+    ]
 
 -- Event handler
 handleEvent :: BrickEvent Name GameOutput -> EventM Name TuiState ()
 handleEvent event = case event of
   AppEvent (ChoicePrompt payload) ->
     handleChoicePromptEvent payload
-
   AppEvent (LogEntry msg msgType) -> do
     st <- get
     case msgType of
       SystemMessage -> do
         let newSysMsgs = systemMessages st `Vec.snoc` msg
-        put st { systemMessages = newSysMsgs }
+        put st {systemMessages = newSysMsgs}
         vScrollToEnd (viewportScroll SystemViewport)
       NarrativeMessage -> do
         let newLogs = logs st `Vec.snoc` msg
-        put st { logs = newLogs }
+        put st {logs = newLogs}
         vScrollToEnd (viewportScroll LogViewport)
-
   AppEvent (CharacterUpdate charData) -> do
     st <- get
-    put st { character = Just charData }
+    put st {character = Just charData}
     invalidateCache
-
   AppEvent GameEnd -> halt
-
   VtyEvent ev -> handleVtyEvent ev
-
   -- Ignore mouse events and others
   _ -> return ()
 
@@ -271,7 +289,7 @@ handleChoicePromptEvent :: ChoicePromptPayload -> EventM Name TuiState ()
 handleChoicePromptEvent payload = do
   st <- get
   let newState = selectFirstEnabledOption (buildChoicePromptState payload)
-  put st { activeChoice = Just newState }
+  put st {activeChoice = Just newState}
 
 buildChoicePromptState :: ChoicePromptPayload -> ChoicePromptState
 buildChoicePromptState payload =
@@ -285,40 +303,40 @@ buildChoicePromptState payload =
         case combinedErrors of
           [] -> Nothing
           errs -> Just (T.intercalate "\n" errs)
-  in ChoicePromptState
-      { choiceStatePayload = payload
-      , choiceStateOptions = optionsVec
-      , choiceStateSelected = 0
-      , choiceStateError = aggregatedError
-      }
+   in ChoicePromptState
+        { choiceStatePayload = payload,
+          choiceStateOptions = optionsVec,
+          choiceStateSelected = 0,
+          choiceStateError = aggregatedError
+        }
 
 decodeChoiceOption :: ChoiceOptionPayload -> (ChoiceOptionState, Maybe T.Text)
 decodeChoiceOption payload =
   case Aeson.eitherDecodeStrict (TE.encodeUtf8 (choiceOptionConsequences payload)) of
     Left err ->
       ( ChoiceOptionState
-          { optionPayload = payload
-          , optionConsequences = []
-          , optionDisabled = True
-          , optionError = Just ("Erro ao decodificar consequências: " <> T.pack err)
-          }
-      , Just $ choiceOptionLabel payload <> ": erro ao decodificar consequências (" <> T.pack err <> ")."
+          { optionPayload = payload,
+            optionConsequences = [],
+            optionDisabled = True,
+            optionError = Just ("Erro ao decodificar consequências: " <> T.pack err)
+          },
+        Just $ choiceOptionLabel payload <> ": erro ao decodificar consequências (" <> T.pack err <> ")."
       )
     Right consequences ->
       ( ChoiceOptionState
-          { optionPayload = payload
-          , optionConsequences = consequences
-          , optionDisabled = False
-          , optionError = Nothing
-          }
-      , Nothing
+          { optionPayload = payload,
+            optionConsequences = consequences,
+            optionDisabled = False,
+            optionError = Nothing
+          },
+        Nothing
       )
 
 selectFirstEnabledOption :: ChoicePromptState -> ChoicePromptState
 selectFirstEnabledOption state =
   let options = choiceStateOptions state
       firstEnabled = Vec.findIndex (not . optionDisabled) options
-  in state { choiceStateSelected = fromMaybe 0 firstEnabled }
+   in state {choiceStateSelected = fromMaybe 0 firstEnabled}
 
 handleVtyEvent :: Vty.Event -> EventM Name TuiState ()
 handleVtyEvent ev = do
@@ -376,17 +394,17 @@ submitCommand = do
     else do
       liftIO $ atomically $ writeTChan (inputChan st) command
       let clearedEditor = Ed.applyEdit clearZipper (editor st)
-      put st { editor = clearedEditor }
+      put st {editor = clearedEditor}
 
 switchFocusNext :: EventM Name TuiState ()
 switchFocusNext = do
   st <- get
-  put st { viewportFocus = F.focusNext (viewportFocus st) }
+  put st {viewportFocus = F.focusNext (viewportFocus st)}
 
 switchFocusPrev :: EventM Name TuiState ()
 switchFocusPrev = do
   st <- get
-  put st { viewportFocus = F.focusPrev (viewportFocus st) }
+  put st {viewportFocus = F.focusPrev (viewportFocus st)}
 
 scrollFocusedViewport :: Int -> EventM Name TuiState ()
 scrollFocusedViewport delta = do
@@ -404,7 +422,7 @@ updateActiveChoice f = do
   st <- get
   case activeChoice st of
     Nothing -> return ()
-    Just cs -> put st { activeChoice = Just (f cs) }
+    Just cs -> put st {activeChoice = Just (f cs)}
 
 moveChoiceSelection :: Int -> ChoicePromptState -> ChoicePromptState
 moveChoiceSelection delta state
@@ -412,9 +430,9 @@ moveChoiceSelection delta state
   | Vec.null options = state
   | otherwise =
       let (result, moved) = iterateOnce (abs delta) state
-      in if moved
-          then result { choiceStateError = Nothing }
-          else result
+       in if moved
+            then result {choiceStateError = Nothing}
+            else result
   where
     options = choiceStateOptions state
     direction = signum delta
@@ -423,8 +441,8 @@ moveChoiceSelection delta state
       case findNextEnabledIndex (choiceStateSelected st) direction options of
         Nothing -> (st, False)
         Just idx ->
-          let (updated, _) = iterateOnce (n - 1) (st { choiceStateSelected = idx })
-          in (updated, True)
+          let (updated, _) = iterateOnce (n - 1) (st {choiceStateSelected = idx})
+           in (updated, True)
 
 findNextEnabledIndex :: Int -> Int -> Vec.Vector ChoiceOptionState -> Maybe Int
 findNextEnabledIndex current direction options
@@ -437,7 +455,7 @@ findNextEnabledIndex current direction options
             take len $
               tail $
                 iterate step current
-      in find (\i -> not (optionDisabled (options Vec.! i))) indices
+       in find (\i -> not (optionDisabled (options Vec.! i))) indices
 
 submitChoiceSelectionIndex :: Int -> EventM Name TuiState ()
 submitChoiceSelectionIndex idx = do
@@ -454,14 +472,14 @@ submitChoiceSelectionIndex idx = do
             else do
               let payload =
                     ChoiceSelectionPayload
-                      { choiceSelectionPromptId = choicePromptId (choiceStatePayload choiceState)
-                      , choiceSelectionSelectedIndex = choiceOptionIndex (optionPayload opt)
-                      , choiceSelectionLabel = choiceOptionLabel (optionPayload opt)
-                      , choiceSelectionConsequences = optionConsequences opt
-                      , choiceSelectionCancelled = False
+                      { choiceSelectionPromptId = choicePromptId (choiceStatePayload choiceState),
+                        choiceSelectionSelectedIndex = choiceOptionIndex (optionPayload opt),
+                        choiceSelectionLabel = choiceOptionLabel (optionPayload opt),
+                        choiceSelectionConsequences = optionConsequences opt,
+                        choiceSelectionCancelled = False
                       }
               sendChoiceCommand (inputChan st) payload
-              put st { activeChoice = Nothing }
+              put st {activeChoice = Nothing}
 
 cancelChoiceSelection :: EventM Name TuiState ()
 cancelChoiceSelection = do
@@ -476,14 +494,14 @@ cancelChoiceSelection = do
           selectedLabel = maybe "" (choiceOptionLabel . optionPayload) maybeOpt
           payload =
             ChoiceSelectionPayload
-              { choiceSelectionPromptId = choicePromptId (choiceStatePayload choiceState)
-              , choiceSelectionSelectedIndex = selectedIndex
-              , choiceSelectionLabel = selectedLabel
-              , choiceSelectionConsequences = []
-              , choiceSelectionCancelled = True
+              { choiceSelectionPromptId = choicePromptId (choiceStatePayload choiceState),
+                choiceSelectionSelectedIndex = selectedIndex,
+                choiceSelectionLabel = selectedLabel,
+                choiceSelectionConsequences = [],
+                choiceSelectionCancelled = True
               }
       sendChoiceCommand (inputChan st) payload
-      put st { activeChoice = Nothing }
+      put st {activeChoice = Nothing}
 
 sendChoiceCommand :: TChan T.Text -> ChoiceSelectionPayload -> EventM Name TuiState ()
 sendChoiceCommand chan payload = do
@@ -497,8 +515,8 @@ setChoiceError err =
           case choiceStateError st of
             Nothing -> err
             Just existing -> existing <> "\n" <> err
-    in st { choiceStateError = Just combinedError }
+     in st {choiceStateError = Just combinedError}
 
 -- Lens for the editor field
 editorL :: Lens' TuiState (Ed.Editor T.Text Name)
-editorL f s = (\e -> s { editor = e }) <$> f (editor s)
+editorL f s = (\e -> s {editor = e}) <$> f (editor s)
