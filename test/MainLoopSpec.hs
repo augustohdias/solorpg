@@ -77,11 +77,11 @@ spec = describe "MainLoop" $ do
       ML.parseActionType "invalid" `shouldBe` Action.Unknown
     
     it "handles case-insensitive commands (via toLower)" $ do
-      -- parseActionType applies toLower to the cmd
-      -- The function receives the command with ":" prefix and applies toLower
+      
+      
       ML.parseActionType ":r" `shouldBe` Action.RollDice
       ML.parseActionType ":exit" `shouldBe` Action.Exit
-      -- Note: parseActionType receives the command after breakOn, which includes ":"
-      -- So ":R" becomes ":r" after T.map toLower
+      
+      
       ML.parseActionType (T.map toLower ":R") `shouldBe` Action.RollDice
       ML.parseActionType (T.map toLower ":EXIT") `shouldBe` Action.Exit

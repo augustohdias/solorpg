@@ -1,7 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module System.Network
-  ( -- Re-export types
+  ( 
     module System.Network.Types
   , module System.Network.Protocol
   , module System.Network.Server

@@ -2,7 +2,6 @@
 module System.DiceSpec (spec) where
 
 import Test.Hspec
-import Test.QuickCheck
 import qualified Data.Text as T
 import qualified System.Dice as Dice
 
@@ -22,7 +21,7 @@ spec = describe "System.Dice" $ do
     it "parses dice types correctly" $ do
       Dice.parseDiceType "6" `shouldBe` Just Dice.D6
       Dice.parseDiceType "10" `shouldBe` Just Dice.D10
-      -- Note: parseDiceType expects just the number, not "D" prefix
+      
     
     it "returns Nothing for invalid dice types" $ do
       Dice.parseDiceType "3" `shouldBe` Nothing

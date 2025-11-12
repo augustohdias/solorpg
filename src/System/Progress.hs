@@ -19,7 +19,7 @@ module System.Progress
   , completeTrack
   , clearTrack
   , executeProgressRoll
-  -- Exported for testing
+  
   , evaluateProgressRoll
   , getRankExperienceValue
   ) where
@@ -30,57 +30,57 @@ import qualified Data.Text as T
 import GHC.Generics (Generic)
 import Data.Aeson (ToJSON, FromJSON)
 
--- | Rank de desafio (dificuldade)
+
 data ChallengeRank
-  = Troublesome  -- ^ Simples - 3 progress (12 ticks) por mark
-  | Dangerous    -- ^ Típico - 2 progress (8 ticks) por mark
-  | Formidable   -- ^ Difícil - 1 progress (4 ticks) por mark
-  | Extreme      -- ^ Muito difícil - 2 ticks por mark
-  | Epic         -- ^ Lendário - 1 tick por mark
+  = Troublesome  
+  | Dangerous    
+  | Formidable   
+  | Extreme      
+  | Epic         
   deriving (Eq, Show, Read, Generic, ToJSON, FromJSON)
 
--- | Tipo de progress track
+
 data ProgressType
-  = Vow          -- ^ Juramento/missão
-  | Combat       -- ^ Combate
-  | Journey      -- ^ Jornada
-  | Bond         -- ^ Vínculos (bonds)
+  = Vow          
+  | Combat       
+  | Journey      
+  | Bond         
   deriving (Eq, Show, Read, Generic, ToJSON, FromJSON)
 
--- | Progress Track
--- 10 boxes, cada box tem 4 ticks (total: 40 ticks)
+
+
 data ProgressTrack = ProgressTrack
-  { trackName :: !T.Text            -- ^ Nome do track (ex: "Vingar meu pai")
-  , trackType :: !ProgressType      -- ^ Tipo do track
-  , trackRank :: !ChallengeRank     -- ^ Rank de dificuldade
-  , trackTicks :: !Int              -- ^ Ticks marcados (0-40)
-  , trackCompleted :: !Bool         -- ^ Se foi completado
+  { trackName :: !T.Text            
+  , trackType :: !ProgressType      
+  , trackRank :: !ChallengeRank     
+  , trackTicks :: !Int              
+  , trackCompleted :: !Bool         
   } deriving (Eq, Show, Generic, ToJSON, FromJSON)
 
--- | Resultado de um progress roll
+
 data ProgressRollResult = ProgressRollResult
-  { progressScore :: Int                    -- ^ Score (boxes completos)
-  , progressChallengeDice :: (Int, Int)     -- ^ Challenge dice rolados
-  , progressRollResult :: Dice.RollResult  -- ^ Resultado (Strong/Weak/Miss)
-  , progressMatch :: Bool                   -- ^ Se houve match
+  { progressScore :: Int                    
+  , progressChallengeDice :: (Int, Int)     
+  , progressRollResult :: Dice.RollResult  
+  , progressMatch :: Bool                   
   } deriving (Eq, Show)
 
--- | Resultado de completar um progress roll com experiência
+
 data ProgressCompletionResult = ProgressCompletionResult
   { completionTrack :: ProgressTrack
   , experienceGained :: Int
   , completionMessage :: T.Text
   } deriving (Show)
 
--- | Resultado completo da execução de um progress roll
+
 data ProgressRollExecutionResult = ProgressRollExecutionResult
-  { executionNarrativeMessage :: T.Text      -- ^ Mensagem formatada para log narrativo
-  , executionUpdatedTrack :: ProgressTrack   -- ^ Track após processamento completo
-  , executionExperienceGained :: Int         -- ^ Experiência ganha (0 se nenhuma)
-  , executionSystemMessage :: Maybe T.Text  -- ^ Mensagem de sistema (se houver)
+  { executionNarrativeMessage :: T.Text      
+  , executionUpdatedTrack :: ProgressTrack   
+  , executionExperienceGained :: Int         
+  , executionSystemMessage :: Maybe T.Text  
   } deriving (Show)
 
--- | Cria novo progress track
+
 newProgressTrack :: T.Text -> ProgressType -> ChallengeRank -> ProgressTrack
 newProgressTrack name pType rank = ProgressTrack
   { trackName = name
@@ -90,24 +90,24 @@ newProgressTrack name pType rank = ProgressTrack
   , trackCompleted = False
   }
 
--- | Calcula progress score (número de boxes completos)
+
 getProgressScore :: ProgressTrack -> Int
 getProgressScore track = trackTicks track `div` 4
 
--- | Retorna quantos ticks marcar por rank
-getTicksForRank :: ChallengeRank -> Int
-getTicksForRank Troublesome = 12  -- 3 boxes (3 * 4 ticks)
-getTicksForRank Dangerous = 8     -- 2 boxes (2 * 4 ticks)
-getTicksForRank Formidable = 4    -- 1 box (1 * 4 ticks)
-getTicksForRank Extreme = 2       -- 2 ticks
-getTicksForRank Epic = 1          -- 1 tick
 
--- | Calcula porcentagem de progresso
+getTicksForRank :: ChallengeRank -> Int
+getTicksForRank Troublesome = 12  
+getTicksForRank Dangerous = 8     
+getTicksForRank Formidable = 4    
+getTicksForRank Extreme = 2       
+getTicksForRank Epic = 1          
+
+
 progressPercentage :: ProgressTrack -> Double
 progressPercentage track = 
   (fromIntegral (trackTicks track) / 40.0) * 100.0
 
--- | Marca progresso baseado no rank do track
+
 markProgress :: ProgressTrack -> IO ProgressTrack
 markProgress track
   | trackCompleted track = do
@@ -123,7 +123,7 @@ markProgress track
       
       return $ track { trackTicks = newTicks }
 
--- | Marca quantidade específica de ticks
+
 markProgressTicks :: ProgressTrack -> Int -> IO ProgressTrack
 markProgressTicks track ticksToAdd
   | trackCompleted track = return track
@@ -131,12 +131,12 @@ markProgressTicks track ticksToAdd
       let newTicks = min 40 (trackTicks track + ticksToAdd)
       return $ track { trackTicks = newTicks }
 
--- | Faz progress roll (2d10 vs progress score)
+
 rollProgress :: ProgressTrack -> IO ProgressRollResult
 rollProgress track = do
   let score = getProgressScore track
   
-  -- Rola apenas 2d10 (sem action die!)
+  
   rolls <- Dice.roll (T.pack "2d10")
   
   case rolls of
@@ -157,11 +157,11 @@ rollProgress track = do
         , progressMatch = False
         }
 
--- | Completa um track
+
 completeTrack :: ProgressTrack -> IO ProgressTrack
 completeTrack track = return $ track { trackCompleted = True }
 
--- | Completa track e calcula experiência baseado no resultado
+
 completeProgressRoll :: ProgressTrack -> ProgressRollResult -> IO ProgressCompletionResult
 completeProgressRoll track rollResult = do
   case progressRollResult rollResult of
@@ -192,7 +192,7 @@ completeProgressRoll track rollResult = do
       let msg = "Erro na rolagem"
       return $ ProgressCompletionResult track 0 msg
 
--- | Obtém valor de experiência baseado no rank
+
 getRankExperienceValue :: ChallengeRank -> Int
 getRankExperienceValue Troublesome = 1
 getRankExperienceValue Dangerous = 2
@@ -200,20 +200,20 @@ getRankExperienceValue Formidable = 3
 getRankExperienceValue Extreme = 4
 getRankExperienceValue Epic = 5
 
--- | Limpa um track (reseta progresso)
+
 clearTrack :: ProgressTrack -> IO ProgressTrack
 clearTrack track = do
   putStrLn $ "  ○ Track limpo: " ++ T.unpack (trackName track)
   return $ track { trackTicks = 0, trackCompleted = False }
 
--- | Avalia progress roll
+
 evaluateProgressRoll :: Int -> Int -> Int -> Dice.RollResult
 evaluateProgressRoll score ch1 ch2
   | score > ch1 && score > ch2 = Dice.StrongHit
   | score > ch1 || score > ch2 = Dice.WeakHit
   | otherwise = Dice.Miss
 
--- | Formata resultado de progress roll
+
 formatProgressRollResult :: ProgressRollResult -> ProgressType -> T.Text
 formatProgressRollResult result pType =
   let score = progressScore result
@@ -257,7 +257,7 @@ formatProgressRollResult result pType =
           <> "\n"
    in header <> T.pack interpretation
 
--- | Executa progress roll completo e retorna resultado formatado
+
 executeProgressRoll :: ProgressTrack -> IO ProgressRollExecutionResult
 executeProgressRoll track = do
   rollResult <- rollProgress track

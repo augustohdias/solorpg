@@ -16,8 +16,8 @@ spec = describe "System.Util.Parser" $ do
     
     it "returns Nothing for invalid formats" $ do
       Parser.parseKeyValue "no-colon" `shouldBe` Nothing
-      -- splitOn ":" on "multiple:colons:here" returns ["multiple", "colons", "here"]
-      -- which doesn't match [k, v] pattern, so returns Nothing
+      
+      
       Parser.parseKeyValue "multiple:colons:here" `shouldBe` Nothing
       Parser.parseKeyValue "" `shouldBe` Nothing
 
@@ -26,7 +26,7 @@ spec = describe "System.Util.Parser" $ do
       Parser.parseDecimal "0" `shouldBe` Just 0
       Parser.parseDecimal "5" `shouldBe` Just 5
       Parser.parseDecimal "123" `shouldBe` Just 123
-      Parser.parseDecimal "-5" `shouldBe` Nothing  -- Only positive
+      Parser.parseDecimal "-5" `shouldBe` Nothing  
     
     it "returns Nothing for invalid input" $ do
       Parser.parseDecimal "abc" `shouldBe` Nothing
@@ -152,4 +152,4 @@ spec = describe "System.Util.Parser" $ do
     it "uses default values for missing attributes" $ do
       let attrs = Parser.parseAttributes ["iron:3"]
       GameContext.iron attrs `shouldBe` 3
-      -- Other attributes should have default values
+      

@@ -1,25 +1,25 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE OverloadedStrings #-}
 
--- | Módulo de funções utilitárias para parsing de texto.
+
 --
---     Este módulo contém funções auxiliares para parsear diferentes formatos
---     de entrada de texto, como atributos, recursos, valores numéricos, etc.
+
+
 module System.Util.Parser
-  ( -- * Parsing de atributos
+  ( 
     parseAttributes,
     parseAttributeUpdate,
     parseAttributeAdd,
 
-    -- * Parsing de recursos
+    
     parseResourceUpdate,
     parseResourceAdd,
 
-    -- * Parsing de progress tracks
+    
     parseRank,
     rankToText,
 
-    -- * Parsing genérico
+    
     parseKeyValue,
     parseDecimal,
     parseSignedDecimal,
@@ -29,13 +29,13 @@ module System.Util.Parser
     buildChoicePromptPayload,
     encodeConsequencesToText,
 
-    -- * Parsing de vínculos
+    
     parseBondCommand,
 
-    -- * Parsing de bônus
+    
     parseBonusCommand,
 
-    -- * Funções auxiliares
+    
     clamp,
   )
 where
@@ -97,7 +97,7 @@ encodeConsequencesToText :: [Consequence.Consequence] -> T.Text
 encodeConsequencesToText =
   TL.toStrict . TLE.decodeUtf8 . Aeson.encode
 
--- | Parse atributos de uma lista de textos (ex: ["iron:3", "edge:2"])
+
 parseAttributes :: [T.Text] -> GameContext.Attributes
 parseAttributes parts =
   let defVal = C.configDefaultAttributeValue C.defaultConfig
@@ -121,7 +121,7 @@ parseAttributes parts =
         defaultAttrs
         parts
 
--- | Parse atualização de atributo
+
 parseAttributeUpdate :: T.Text -> GameContext.Attributes -> Maybe GameContext.Attributes
 parseAttributeUpdate input attrs = do
   (key, valStr) <- parseKeyValue input
@@ -134,7 +134,7 @@ parseAttributeUpdate input attrs = do
     "wits" -> Just $ attrs {GameContext.wits = n}
     _ -> Nothing
 
--- | Parse adição/remoção de atributo (delta com valores negativos)
+
 parseAttributeAdd :: T.Text -> GameContext.Attributes -> Maybe GameContext.Attributes
 parseAttributeAdd input attrs = do
   (key, valStr) <- parseKeyValue input
@@ -147,7 +147,7 @@ parseAttributeAdd input attrs = do
     "wits" -> Just $ attrs {GameContext.wits = GameContext.wits attrs + delta}
     _ -> Nothing
 
--- | Parse definição de recurso (apenas define valor absoluto)
+
 parseResourceUpdate :: T.Text -> GameContext.Resources -> Maybe GameContext.Resources
 parseResourceUpdate input res = do
   (key, valStr) <- parseKeyValue input
@@ -160,7 +160,7 @@ parseResourceUpdate input res = do
     "experience" -> Just $ res {GameContext.experience = n}
     _ -> Nothing
 
--- | Parse adição/remoção de recurso (delta com valores negativos)
+
 parseResourceAdd :: T.Text -> GameContext.Resources -> Maybe GameContext.Resources
 parseResourceAdd input res = do
   (key, valStr) <- parseKeyValue input
@@ -256,18 +256,18 @@ parseBondCommand input =
 
     cleanNote = stripQuotes . T.strip
 
--- Função que separa strings entre aspas duplas usando Text
+
 separateStrings :: T.Text -> [T.Text]
 separateStrings texto = case T.uncons texto of
   Nothing -> []
   Just ('"', resto) ->
     let (str, resto') = T.break (== '"') resto
      in if T.null resto'
-          then [str] -- Caso não tenha aspas de fechamento
+          then [str] 
           else str : separateStrings (T.tail resto')
   Just (_, resto) -> separateStrings resto
 
--- | Funções auxiliares de parsing
+
 parseKeyValue :: T.Text -> Maybe (T.Text, T.Text)
 parseKeyValue input =
   case T.splitOn ":" input of
@@ -286,12 +286,12 @@ parseSignedDecimal valStr =
     Right (n, rest) | T.null rest -> Just n
     _ -> Nothing
 
--- | Limita um valor a um intervalo [low, high].
+
 clamp :: Int -> Int -> Int -> Int
 clamp low high x = max low (min high x)
 
--- | Parse string entre aspas duplas
--- Retorna (conteúdo, resto após as aspas)
+
+
 parseQuotedString :: T.Text -> Maybe (T.Text, T.Text)
 parseQuotedString input =
   case T.stripPrefix "\"" (T.stripStart input) of
@@ -300,11 +300,11 @@ parseQuotedString input =
       case T.breakOn "\"" afterFirstQuote of
         (content, rest)
           | not (T.null rest) ->
-              Just (content, T.drop 1 rest) -- Remove a segunda aspa
+              Just (content, T.drop 1 rest) 
         _ -> Nothing
 
--- | Parse query de oráculo
--- Separa o nome do oráculo (que pode estar entre aspas) e um valor opcional
+
+
 parseOracleQuery :: T.Text -> (T.Text, T.Text)
 parseOracleQuery input =
   case parseQuotedString input of
@@ -315,7 +315,7 @@ parseOracleQuery input =
             then ("", "")
             else (head parts, T.unwords (tail parts))
 
--- | Parse ChallengeRank de texto
+
 parseRank :: T.Text -> Maybe Progress.ChallengeRank
 parseRank txt = case T.toLower txt of
   "troublesome" -> Just Progress.Troublesome
@@ -327,7 +327,7 @@ parseRank txt = case T.toLower txt of
     [(rank, "")] -> Just rank
     _ -> Nothing
 
--- | Converte ChallengeRank para texto
+
 rankToText :: Progress.ChallengeRank -> T.Text
 rankToText Progress.Troublesome = "troublesome"
 rankToText Progress.Dangerous = "dangerous"
@@ -335,12 +335,12 @@ rankToText Progress.Formidable = "formidable"
 rankToText Progress.Extreme = "extreme"
 rankToText Progress.Epic = "epic"
 
--- | Parse de comando de bônus
--- Formato: <tipo> <valor> [descrição]
--- Tipos: nextroll, nextmove:<nome>, persistent
--- Exemplo: "nextroll +1 \"Preparado\""
---          "nextmove:FaceDanger +2 \"Vantagem\""
---          "persistent +1 \"Bônus permanente\""
+
+
+
+
+
+
 parseBonusCommand :: T.Text -> Maybe GameContext.ActiveBonus
 parseBonusCommand input = do
   let parts = T.words input

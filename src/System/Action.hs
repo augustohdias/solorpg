@@ -6,10 +6,9 @@ module System.Action
   )
 where
 
-import Control.Concurrent (forkIO)
 import Control.Concurrent.MVar (modifyMVar_)
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
-import Control.Monad (unless, void, when)
+import Control.Monad (unless, void, when, filterM)
 import qualified Data.Aeson as Aeson
 import Data.Char (isAlphaNum)
 import Data.Foldable (forM_, for_)
@@ -20,7 +19,6 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Read as TR
 import Data.Time.Clock (getCurrentTime)
-import Network.Socket (PortNumber)
 import System.ConsequenceContract (Choice (..), Consequence (..))
 import qualified System.ConsequenceContract as Consequence
 import qualified System.Constants as C
@@ -29,6 +27,8 @@ import System.GameContext (BondCommand (..))
 import qualified System.GameContext as GameContext
 import qualified System.Help as Help
 import qualified System.Move as Move
+import qualified System.AssetLoader as AssetLoader
+import Data.List (find)
 import qualified System.Network.Client as NetworkClient
 import qualified System.Network.NetworkState as NetworkState
 import qualified System.Network.Protocol as NetworkProtocol
@@ -45,73 +45,83 @@ import System.Tui.Comm
 import qualified System.Util.Parser as Parser
 
 data ActionType
-  = -- | Rola dados (ex: "3d6,2d10")
+  = 
     RollDice
-  | -- | Adiciona entrada narrativa ao log
+  | 
     AddStoryLog
-  | -- | Mostra logs da sessão
+  | 
     Show
-  | -- | Salva contexto atual
+  | 
     Save
-  | -- | Encerra sessão
+  | 
     Exit
-  | -- | Cria novo personagem (ex: "NomePersonagem")
+  | 
     CreateCharacter
-  | -- | Carrega personagem existente (ex: "NomePersonagem")
+  | 
     LoadCharacter
-  | -- | Mostra informações do personagem atual
+  | 
     ShowCharacter
-  | -- | Define atributo (ex: "iron:3")
+  | 
     UpdateAttribute
-  | -- | Define recurso (ex: "health:4")
+  | 
     UpdateResource
-  | -- | Adiciona/remove atributo (ex: "iron:-1")
+  | 
     AddAttribute
-  | -- | Adiciona/remove recurso (ex: "supply:-2")
+  | 
     AddResource
-  | -- | Rola 1d6,2d10 e avalia resultado
+  | 
     Challenge
-  | -- | Executa um Move de Ironsworn
+  | 
     Move
-  | -- | Jura um voto (cria progress track)
+  | 
     SwearVow
-  | -- | Cria um progress track de combate
+  | 
     CreateCombatTrack
-  | -- | Marca progresso em track
+  | 
     MarkProgress
-  | -- | Faz progress roll
+  | 
     RollProgress
-  | -- | Mostra todos os tracks ativos
+  | 
     ShowTracks
-  | -- | Abandona/remove um track
+  | 
     AbandonTrack
-  | -- | Consulta oráculo
+  | 
     Oracle
-  | -- | Mostra ajuda
+  | 
     Help
-  | -- | Gerencia bonds (vínculos)
+  | 
     Bond
-  | -- | Adiciona bônus de rolagem manualmente
-    AddBonusManually
-  | -- | Resolve uma escolha pendente enviada pela TUI
-    ResolveChoice
-  | -- | Inicia sessão multiplayer como host
+   | 
+     AddBonusManually
+   | 
+     ResolveChoice
+   | 
+     PickAssetCommand
+   | 
+     AddAssetCommand
+   | 
+     ExploreAssets
+   | 
+     ViewAsset
+   | 
+     ShowSkillDescription
+  | 
     HostSession
-  | -- | Conecta a uma sessão multiplayer
+  | 
     ConnectSession
-  | -- | Desconecta da sessão multiplayer
+  | 
     DisconnectSession
-  | -- | Cria um voto compartilhado
+  | 
     SharedVow
-  | -- | Aceita conexão pendente
+  | 
     AcceptConnection
-  | -- | Rejeita conexão pendente
+  | 
     RejectConnection
-  | -- | Ação desconhecida
+  | 
     Unknown
   deriving (Show, Eq)
 
--- | Processa uma ação do jogo
+
 process :: TChan GameOutput -> ActionType -> T.Text -> IO Bool
 process tuiOutputChannel actionType input = case actionType of
   AddStoryLog -> addStoryLog tuiOutputChannel input
@@ -144,19 +154,24 @@ process tuiOutputChannel actionType input = case actionType of
   SharedVow -> sharedVow tuiOutputChannel input
   AcceptConnection -> acceptConnection tuiOutputChannel input
   RejectConnection -> rejectConnection tuiOutputChannel input
+  PickAssetCommand -> pickAsset tuiOutputChannel input
+  AddAssetCommand -> addAsset tuiOutputChannel input
+  ExploreAssets -> exploreAssets tuiOutputChannel input
+  ViewAsset -> viewAsset tuiOutputChannel input
+  ShowSkillDescription -> showSkillDescription tuiOutputChannel input
   _ -> defaultAction tuiOutputChannel input
 
--- | Sends narrative messages to the TUI log channel.
+
 logMessage :: TChan GameOutput -> T.Text -> IO ()
 logMessage tuiOutputChannel msg =
   atomically $ writeTChan tuiOutputChannel (LogEntry msg NarrativeMessage)
 
--- | Sends system notifications to the TUI.
+
 systemMessage :: TChan GameOutput -> T.Text -> IO ()
 systemMessage tuiOutputChannel msg =
   atomically $ writeTChan tuiOutputChannel (LogEntry msg SystemMessage)
 
--- | Executes an action that requires a loaded character context.
+
 withContext :: (GameContext.Context -> IO Bool) -> IO Bool
 withContext action = do
   maybeCtx <- GameContext.getCurrentContext
@@ -164,13 +179,13 @@ withContext action = do
     Nothing -> pure True
     Just ctx -> action ctx
 
--- | Conditionally executes an action with the current context if one exists.
+
 whenContext :: (GameContext.Context -> IO ()) -> IO ()
 whenContext action = do
   maybeCtx <- GameContext.getCurrentContext
   for_ maybeCtx action
 
--- | Default handler for unknown or unimplemented action types.
+
 defaultAction :: TChan GameOutput -> T.Text -> IO Bool
 defaultAction _ _ = return True
 
@@ -180,7 +195,7 @@ isFirstCharAlphaNum text =
     Nothing -> False
     Just (c, _) -> isAlphaNum c
 
--- | Adds a narrative entry to the character's session log.
+
 addStoryLog :: TChan GameOutput -> T.Text -> IO Bool
 addStoryLog tuiOutputChannel story
   | isCommand = return True
@@ -197,34 +212,29 @@ addStoryLog tuiOutputChannel story
         void $ GameContext.saveContext ctxWithLog
         logMessage tuiOutputChannel formattedLog
 
-        -- Se está em modo multiplayer e não é mensagem secreta (começa com ~)
-        if GameContext.isMultiplayer ctx && not (T.isPrefixOf "~" formattedLog)
-          then do
+        when (GameContext.isMultiplayer ctx && not (T.isPrefixOf "~" formattedLog)) $ do
             networkState <- NetworkState.getNetworkState
             timestamp <- getCurrentTime
             let playerName = GameContext.getCharacterName ctx
 
             case networkState of
               NetworkState.ServerState serverState -> do
-                -- Host faz broadcast para todos os clientes
                 let msg = NetworkProtocol.StoryLogEntry playerName formattedLog timestamp
                 NetworkServer.broadcastMessage serverState msg Nothing
               NetworkState.ClientState clientState -> do
-                -- Cliente envia para o host
                 let msg = NetworkProtocol.StoryLogEntry playerName formattedLog timestamp
                 _ <- NetworkClient.sendMessage clientState msg
                 return ()
               NetworkState.NoNetworkState -> return ()
-          else return ()
       return True
 
--- | Sincroniza criação de shared vow
+
 syncSharedVowCreated :: TChan GameOutput -> GameContext.Context -> T.Text -> Progress.ProgressTrack -> IO ()
-syncSharedVowCreated tuiOutputChannel ctx vowName track = do
+syncSharedVowCreated _ ctx vowName track = do
   networkState <- NetworkState.getNetworkState
   let playerName = GameContext.getCharacterName ctx
   let trackData = TE.decodeUtf8 $ BL.toStrict (Aeson.encode track)
-  
+
   case networkState of
     NetworkState.ServerState serverState -> do
       let msg = NetworkProtocol.SharedVowCreated playerName vowName trackData
@@ -234,12 +244,12 @@ syncSharedVowCreated tuiOutputChannel ctx vowName track = do
       void $ NetworkClient.sendMessage clientState msg
     NetworkState.NoNetworkState -> return ()
 
--- | Sincroniza progresso em shared vow
+
 syncSharedVowProgress :: TChan GameOutput -> GameContext.Context -> T.Text -> Int -> IO ()
-syncSharedVowProgress tuiOutputChannel ctx vowName ticks = do
+syncSharedVowProgress _ ctx vowName ticks = do
   networkState <- NetworkState.getNetworkState
   let playerName = GameContext.getCharacterName ctx
-  
+
   case networkState of
     NetworkState.ServerState serverState -> do
       let msg = NetworkProtocol.SharedVowProgress playerName vowName ticks
@@ -249,12 +259,12 @@ syncSharedVowProgress tuiOutputChannel ctx vowName ticks = do
       void $ NetworkClient.sendMessage clientState msg
     NetworkState.NoNetworkState -> return ()
 
--- | Sincroniza conclusão de shared vow
+
 syncSharedVowCompleted :: TChan GameOutput -> GameContext.Context -> T.Text -> Int -> IO ()
-syncSharedVowCompleted tuiOutputChannel ctx vowName experience = do
+syncSharedVowCompleted _ ctx vowName experience = do
   networkState <- NetworkState.getNetworkState
   let playerName = GameContext.getCharacterName ctx
-  
+
   case networkState of
     NetworkState.ServerState serverState -> do
       let msg = NetworkProtocol.SharedVowCompleted playerName vowName experience
@@ -264,7 +274,7 @@ syncSharedVowCompleted tuiOutputChannel ctx vowName experience = do
       void $ NetworkClient.sendMessage clientState msg
     NetworkState.NoNetworkState -> return ()
 
--- | Executes dice rolls using dice specification strings.
+
 rollDice :: TChan GameOutput -> T.Text -> IO Bool
 rollDice tuiOutputChannel diceDescription = do
   rolls <- Dice.roll diceDescription
@@ -272,7 +282,7 @@ rollDice tuiOutputChannel diceDescription = do
   _ <- process tuiOutputChannel AddStoryLog msg
   return True
 
--- | Displays the current character's session logs.
+
 showLogs :: TChan GameOutput -> T.Text -> IO Bool
 showLogs tuiOutputChannel _ = withContext $ \ctx -> do
   systemMessage tuiOutputChannel (C.msgLogsHeader C.messages)
@@ -280,33 +290,84 @@ showLogs tuiOutputChannel _ = withContext $ \ctx -> do
   mapM_ (logMessage tuiOutputChannel) logs
   return True
 
--- | Terminates the current game session.
+
 exit :: TChan GameOutput -> T.Text -> IO Bool
 exit tuiOutputChannel _ = do
   systemMessage tuiOutputChannel (C.msgSessionEnded C.messages)
   atomically $ writeTChan tuiOutputChannel GameEnd
   return False
 
--- | Creates a new character with specified name and attributes.
+
+
+
 createCharacter :: TChan GameOutput -> T.Text -> IO Bool
 createCharacter tuiOutputChannel input = do
   let parts = T.words input
   case parts of
     [] -> systemMessage tuiOutputChannel (C.msgCharacterNameRequired C.messages) >> return True
-    (charName : attrParts) -> do
+    (charName : paramParts) -> do
+      
+      let (assetParts, attrParts) = partition (T.isPrefixOf "assets:") paramParts
+
+      
+      playerAssets <- case assetParts of
+        [] -> return []
+        (assetParam:_) -> parseAssetsParam assetParam
+
       let attrs = Parser.parseAttributes attrParts
       result <- GameContext.createContext charName attrs
-      either handleError handleSuccess result
+      case result of
+        Left err -> handleError err
+        Right ctx -> do
+          
+          finalCtx <- if null playerAssets
+            then return ctx
+            else addAssetsToCharacter ctx playerAssets
+
+          _ <- GameContext.saveContext finalCtx
+          handleSuccess finalCtx
   where
     handleError err = systemMessage tuiOutputChannel (C.msgErrorCreating C.messages <> T.pack (show err)) >> return True
     handleSuccess ctx = do
       let msg = C.msgCharacterCreated C.messages <> GameContext.getCharacterName ctx
       systemMessage tuiOutputChannel msg
-      _ <- GameContext.saveContext ctx
+
+      
+      let assets = GameContext.assets (GameContext.mainCharacter ctx)
+      unless (null assets) $ do
+        systemMessage tuiOutputChannel "Assets selecionados:"
+        mapM_ (\asset -> systemMessage tuiOutputChannel $ "  - " <> GameContext.playerAssetName asset) assets
+
       atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter ctx))
       return True
 
--- | Loads an existing character from persistent storage.
+    
+    parseAssetsParam :: T.Text -> IO [GameContext.PlayerAsset]
+    parseAssetsParam param = do
+      let assetNames = T.splitOn "," (T.drop 7 param) 
+      validAssets <- filterM AssetLoader.assetExists assetNames
+
+      
+      let invalidAssets = filter (`notElem` validAssets) assetNames
+      unless (null invalidAssets) $ systemMessage tuiOutputChannel $ "Assets não encontrados: " <> T.intercalate ", " invalidAssets
+
+      return $ map (\name -> GameContext.PlayerAsset name [1]) validAssets 
+
+    
+    addAssetsToCharacter :: GameContext.Context -> [GameContext.PlayerAsset] -> IO GameContext.Context
+    addAssetsToCharacter ctx playerAssets = do
+      let char = GameContext.mainCharacter ctx
+      let updatedChar = char { GameContext.assets = playerAssets }
+      return ctx { GameContext.mainCharacter = updatedChar }
+
+    partition :: (a -> Bool) -> [a] -> ([a], [a])
+    partition pred' = foldr select ([], [])
+      where
+        select x (trues, falses)
+          | pred' x   = (x:trues, falses)
+          | otherwise = (trues, x:falses)
+
+
 loadCharacter :: TChan GameOutput -> T.Text -> IO Bool
 loadCharacter tuiOutputChannel charName
   | T.null charName = systemMessage tuiOutputChannel (C.msgCharacterNameRequired C.messages) >> return True
@@ -324,14 +385,14 @@ loadCharacter tuiOutputChannel charName
       atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter ctx))
       return True
 
--- | Displays current character information in the TUI.
+
 showCharacter :: TChan GameOutput -> T.Text -> IO Bool
 showCharacter tuiOutputChannel _ = withContext $ \ctx -> do
   let char = GameContext.mainCharacter ctx
   atomically $ writeTChan tuiOutputChannel (CharacterUpdate char)
   return True
 
--- | Updates a character attribute to an absolute value.
+
 updateAttribute :: TChan GameOutput -> T.Text -> IO Bool
 updateAttribute tuiOutputChannel input = withContext $ \ctx -> do
   let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
@@ -345,7 +406,7 @@ updateAttribute tuiOutputChannel input = withContext $ \ctx -> do
       atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter updatedCtx))
       return True
 
--- | Updates a character resource to an absolute value.
+
 updateResource :: TChan GameOutput -> T.Text -> IO Bool
 updateResource tuiOutputChannel input = withContext $ \ctx -> do
   let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
@@ -359,7 +420,7 @@ updateResource tuiOutputChannel input = withContext $ \ctx -> do
       atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter updatedCtx))
       return True
 
--- | Modifies a character attribute by a delta value.
+
 addAttribute :: TChan GameOutput -> T.Text -> IO Bool
 addAttribute tuiOutputChannel input = withContext $ \ctx -> do
   let oldAttrs = GameContext.attributes (GameContext.mainCharacter ctx)
@@ -373,7 +434,7 @@ addAttribute tuiOutputChannel input = withContext $ \ctx -> do
       atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter updatedCtx))
       return True
 
--- | Modifies a character resource by a delta value.
+
 addResource :: TChan GameOutput -> T.Text -> IO Bool
 addResource tuiOutputChannel input = withContext $ \ctx -> do
   let oldRes = GameContext.resources (GameContext.mainCharacter ctx)
@@ -387,17 +448,47 @@ addResource tuiOutputChannel input = withContext $ \ctx -> do
       atomically $ writeTChan tuiOutputChannel (CharacterUpdate (GameContext.mainCharacter updatedCtx))
       return True
 
--- | Executes an Ironsworn challenge roll (1d6 + 2d10).
+
 challenge :: TChan GameOutput -> T.Text -> IO Bool
-challenge tuiOutputChannel _ = do
+challenge tuiOutputChannel input = withContext $ \ctx -> do
+  let strippedInput = T.strip input
+      maybeStat = if T.null strippedInput then Nothing else Move.parseStat strippedInput
+      statModifier = case maybeStat of
+        Just stat -> 
+          let char = GameContext.mainCharacter ctx
+              attrs = GameContext.attributes char
+          in getStatValue stat attrs
+        Nothing -> 0
+  
   result <- Dice.challengeRoll
-  either handleError handleSuccess result
+  either handleError (handleSuccess statModifier) result
   where
+    getStatValue :: Move.Stat -> GameContext.Attributes -> Int
+    getStatValue stat attrs = case stat of
+      Move.Iron -> GameContext.iron attrs
+      Move.Edge -> GameContext.edge attrs
+      Move.Heart -> GameContext.heart attrs
+      Move.Shadow -> GameContext.shadow attrs
+      Move.Wits -> GameContext.wits attrs
+    
     handleError err = systemMessage tuiOutputChannel err >> return True
-    handleSuccess challengeResult = do
+    handleSuccess modifier challengeResult = do
+      let actionDie = Dice.challengeActionDie challengeResult
+          ch1 = Dice.challengeDie1 challengeResult
+          ch2 = Dice.challengeDie2 challengeResult
+          modifiedActionDie = actionDie + modifier
+          recalculatedResult = Dice.evaluateActionRoll modifiedActionDie ch1 ch2
+          hasMatch = Dice.challengeMatch challengeResult
+          modifiedChallengeResult = Dice.ChallengeResult
+            { Dice.challengeActionDie = modifiedActionDie
+            , Dice.challengeDie1 = ch1
+            , Dice.challengeDie2 = ch2
+            , Dice.challengeRollResult = recalculatedResult
+            , Dice.challengeMatch = hasMatch
+            }
       let formattedMsg =
             Dice.formatChallengeResult
-              challengeResult
+              modifiedChallengeResult
               (C.formatActionRoll C.characterDisplay)
               (C.challengeStrongHit C.challengeInterpretation)
               (C.challengeWeakHit C.challengeInterpretation)
@@ -406,7 +497,7 @@ challenge tuiOutputChannel _ = do
       _ <- process tuiOutputChannel AddStoryLog formattedMsg
       return True
 
--- | Executes an Ironsworn move with optional stat modifier.
+
 moveAction :: TChan GameOutput -> T.Text -> IO Bool
 moveAction tuiOutputChannel input = withContext $ \ctx -> do
   let parts = T.words input
@@ -425,7 +516,7 @@ moveAction tuiOutputChannel input = withContext $ \ctx -> do
           consequences <- Move.executeMove moveType maybeStat attrs resources
           processConsequences tuiOutputChannel consequences ctx >> return True
 
--- | Parses move command parameters into optional stat and remaining text.
+
 parseMoveParams :: [T.Text] -> (Maybe Move.Stat, T.Text)
 parseMoveParams [] = (Nothing, "")
 parseMoveParams params@(first : rest) = (stat, text)
@@ -433,14 +524,49 @@ parseMoveParams params@(first : rest) = (stat, text)
     stat = Move.parseStat first
     text = maybe (T.unwords params) (const (T.unwords rest)) stat
 
--- | Processes a list of consequences from moves or oracle results.
+
+addAssetToPlayerContext :: TChan GameOutput -> T.Text -> IO ()
+addAssetToPlayerContext tuiOutputChannel assetName = do
+  maybeCtx <- GameContext.getCurrentContext
+  case maybeCtx of
+    Nothing -> do
+      systemMessage tuiOutputChannel "Nenhum personagem carregado."
+      return ()
+    Just ctx -> do
+      
+      assetExists <- AssetLoader.assetExists assetName
+      if not assetExists
+        then do
+          systemMessage tuiOutputChannel $ "Asset não encontrado: " <> assetName
+          return ()
+        else do
+          
+          let playerAssets = GameContext.assets (GameContext.mainCharacter ctx)
+          let alreadyHas = any (\pa -> GameContext.playerAssetName pa == assetName) playerAssets
+          if alreadyHas
+            then do
+              systemMessage tuiOutputChannel $ "Você já possui o asset: " <> assetName
+              return ()
+            else do
+              
+              let newAsset = GameContext.PlayerAsset assetName [1] 
+              let char = GameContext.mainCharacter ctx
+              let newChar = char { GameContext.assets = newAsset : playerAssets }
+              let updatedCtx = ctx { GameContext.mainCharacter = newChar }
+
+              _ <- GameContext.saveContext updatedCtx
+              systemMessage tuiOutputChannel $ "Asset adquirido: " <> assetName
+              atomically $ writeTChan tuiOutputChannel (CharacterUpdate newChar)
+              return ()
+
+
 processConsequences :: TChan GameOutput -> [Consequence] -> GameContext.Context -> IO ()
 processConsequences _ [] _ = pure ()
 processConsequences tuiOutputChannel (current : rest) ctx = do
   shouldPause <- processConsequence tuiOutputChannel ctx current rest
   unless shouldPause (processConsequences tuiOutputChannel rest ctx)
 
--- | Processes a single consequence using the recursive action architecture.
+
 processConsequence :: TChan GameOutput -> GameContext.Context -> Consequence -> [Consequence] -> IO Bool
 processConsequence tuiOutputChannel ctx cons remaining = case cons of
   Narrative text -> do
@@ -481,8 +607,45 @@ processConsequence tuiOutputChannel ctx cons remaining = case cons of
   MarkBondProgress -> do
     markBondProgressTrack tuiOutputChannel ctx
     return False
+  Consequence.ImproveAsset assetName -> do
+    
+    let currentXP = GameContext.experience (GameContext.resources (GameContext.mainCharacter ctx))
+    if currentXP < 1
+      then do
+        systemMessage tuiOutputChannel "Experiência insuficiente. Custa 1 XP para melhorar um asset."
+        return False
+      else do
+        successful <- improvePlayerAsset tuiOutputChannel ctx assetName
+        if successful
+          then do
+            
+            _ <- process tuiOutputChannel AddResource "experience:-1"
+            systemMessage tuiOutputChannel "Gastou 1 XP para melhorar o asset."
+            return False
+          else return False 
+  Consequence.PickAsset description -> do
+    
+    let currentXP = GameContext.experience (GameContext.resources (GameContext.mainCharacter ctx))
+    if currentXP < 2
+      then do
+        systemMessage tuiOutputChannel "Experiência insuficiente. Custa 2 XP para adquirir um novo asset."
+        return False
+      else do
+        successful <- presentPickAssetChoice tuiOutputChannel description remaining
+        if successful
+          then do
+            
+            return True 
+          else return True 
+  Consequence.AddAssetToPlayer assetName -> do
+    addAssetToPlayerContext tuiOutputChannel assetName
+    return False
+  Consequence.DeductExperience amount -> do
+    _ <- process tuiOutputChannel AddResource ("experience:-" <> T.pack (show amount))
+    systemMessage tuiOutputChannel $ "Gastou " <> T.pack (show amount) <> " XP."
+    return False
 
--- | Sends a structured choice prompt to the TUI.
+
 presentPlayerChoice :: TChan GameOutput -> [Choice] -> [Consequence] -> IO ()
 presentPlayerChoice tuiOutputChannel choices remaining = do
   promptIdSeed <- randomIO :: IO Int
@@ -490,7 +653,7 @@ presentPlayerChoice tuiOutputChannel choices remaining = do
   atomically $ writeTChan tuiOutputChannel (ChoicePrompt payload)
   systemMessage tuiOutputChannel "Escolha uma opção para continuar o movimento."
 
--- | Handles the command that resolves a pending player choice sent from the TUI.
+
 resolveChoice :: TChan GameOutput -> T.Text -> IO Bool
 resolveChoice tuiOutputChannel rawInput =
   case Aeson.eitherDecodeStrict (TE.encodeUtf8 rawInput) of
@@ -516,7 +679,7 @@ resolveChoice tuiOutputChannel rawInput =
               processConsequences tuiOutputChannel (choiceSelectionConsequences selection) ctx
               return True
 
--- | Marks progress on the bonds track when Forge a Bond succeeds.
+
 markBondProgressTrack :: TChan GameOutput -> GameContext.Context -> IO ()
 markBondProgressTrack tuiOutputChannel _ctx = do
   maybeCurrentCtx <- GameContext.getCurrentContext
@@ -545,7 +708,219 @@ markBondProgressTrack tuiOutputChannel _ctx = do
       let ticks = Progress.trackTicks updatedTrack
       logMessage tuiOutputChannel $ "[+] Bond progress: " <> T.pack (show boxes) <> "/10 boxes (" <> T.pack (show ticks) <> "/40 ticks)"
 
--- | Applies a delta change to character resources through Action.process.
+
+improvePlayerAsset :: TChan GameOutput -> GameContext.Context -> T.Text -> IO Bool
+improvePlayerAsset tuiOutputChannel ctx assetName = do
+  let playerAssets = GameContext.assets (GameContext.mainCharacter ctx)
+  case find (\pa -> GameContext.playerAssetName pa == assetName) playerAssets of
+    Nothing -> do
+      systemMessage tuiOutputChannel $ "Você não possui o asset: " <> assetName
+      return False
+    Just playerAsset -> do
+      
+      maybeBaseAsset <- AssetLoader.findAssetByName assetName
+      case maybeBaseAsset of
+        Nothing -> do
+          systemMessage tuiOutputChannel $ "Definição do asset não encontrada: " <> assetName
+          return False
+        Just baseAsset -> do
+          let currentSkills = GameContext.enabledSkills playerAsset
+          let maxSkills = length (GameContext.assetSkills baseAsset)
+          let nextSkillIndex = maximum currentSkills + 1
+
+          if nextSkillIndex > maxSkills
+            then do
+              systemMessage tuiOutputChannel $ "Asset " <> assetName <> " já está totalmente melhorado."
+              return False
+            else do
+              
+              let updatedSkills = nextSkillIndex : currentSkills
+              let updatedAsset = playerAsset { GameContext.enabledSkills = updatedSkills }
+              let otherAssets = filter (\pa -> GameContext.playerAssetName pa /= assetName) playerAssets
+              let char = GameContext.mainCharacter ctx
+              let newChar = char { GameContext.assets = updatedAsset : otherAssets }
+              let updatedCtx = ctx { GameContext.mainCharacter = newChar }
+
+              _ <- GameContext.saveContext updatedCtx
+              systemMessage tuiOutputChannel $ "Asset melhorado: " <> assetName <> " (habilidade " <> T.pack (show nextSkillIndex) <> " habilitada)"
+              atomically $ writeTChan tuiOutputChannel (CharacterUpdate newChar)
+              return True
+
+
+presentPickAssetChoice :: TChan GameOutput -> T.Text -> [Consequence] -> IO Bool
+presentPickAssetChoice tuiOutputChannel _ remaining = do
+  availableAssets <- AssetLoader.getAvailableAssets
+  if null availableAssets
+    then do
+      systemMessage tuiOutputChannel "Nenhum asset disponível para escolha."
+      return False
+    else do
+      let assetChoices = map createAssetChoice availableAssets
+      presentPlayerChoice tuiOutputChannel assetChoices remaining
+      return True
+  where
+    createAssetChoice :: GameContext.Asset -> Consequence.Choice
+    createAssetChoice asset =
+      Consequence.Choice
+        { Consequence.choiceDescription = GameContext.assetName asset
+        , Consequence.choiceConsequences =
+            [ Consequence.Narrative $ "Agora eu tenho " <> GameContext.assetName asset
+            , Consequence.AddAssetToPlayer (GameContext.assetName asset)
+            , Consequence.DeductExperience 2  
+            ]
+        }
+
+
+pickAsset :: TChan GameOutput -> T.Text -> IO Bool
+pickAsset tuiOutputChannel input = withContext $ \ctx -> do
+  let assetName = T.strip input
+  if T.null assetName
+    then do
+      systemMessage tuiOutputChannel "Use: :pickasset <Nome do Asset>"
+      return True
+    else do
+      
+      assetExists <- AssetLoader.assetExists assetName
+      if not assetExists
+        then do
+          systemMessage tuiOutputChannel $ "Asset não encontrado: " <> assetName
+          return True
+        else do
+          
+          let playerAssets = GameContext.assets (GameContext.mainCharacter ctx)
+          let alreadyHas = any (\pa -> GameContext.playerAssetName pa == assetName) playerAssets
+          if alreadyHas
+            then do
+              systemMessage tuiOutputChannel $ "Você já possui o asset: " <> assetName
+              return True
+            else do
+              
+              let currentXP = GameContext.experience (GameContext.resources (GameContext.mainCharacter ctx))
+              if currentXP < 2
+                then do
+                  systemMessage tuiOutputChannel "Experiência insuficiente. Custa 2 XP para adquirir um asset."
+                  return True
+                else do
+                  
+                  let newAsset = GameContext.PlayerAsset assetName [1] 
+                  let char = GameContext.mainCharacter ctx
+                  let oldRes = GameContext.resources char
+                  let newRes = oldRes { GameContext.experience = currentXP - 2 }
+                  let newChar = char { GameContext.assets = newAsset : playerAssets
+                                     , GameContext.resources = newRes }
+                  let updatedCtx = ctx { GameContext.mainCharacter = newChar }
+
+                  _ <- GameContext.saveContext updatedCtx
+                  systemMessage tuiOutputChannel $ "Asset adquirido: " <> assetName <> " (custou 2 XP)"
+                  atomically $ writeTChan tuiOutputChannel (CharacterUpdate newChar)
+                  return True
+
+
+addAsset :: TChan GameOutput -> T.Text -> IO Bool
+addAsset tuiOutputChannel input = withContext $ \ctx -> do
+  let assetName = T.strip input
+  if T.null assetName
+    then do
+      systemMessage tuiOutputChannel "Use: :addasset <Nome do Asset>"
+      return True
+    else do
+      
+      assetExists <- AssetLoader.assetExists assetName
+      if not assetExists
+        then do
+          systemMessage tuiOutputChannel $ "Asset não encontrado: " <> assetName
+          return True
+        else do
+          
+          let playerAssets = GameContext.assets (GameContext.mainCharacter ctx)
+          let alreadyHas = any (\pa -> GameContext.playerAssetName pa == assetName) playerAssets
+          if alreadyHas
+            then do
+              systemMessage tuiOutputChannel $ "Você já possui o asset: " <> assetName
+              return True
+            else do
+              
+              let newAsset = GameContext.PlayerAsset assetName [1] 
+              let char = GameContext.mainCharacter ctx
+              let newChar = char { GameContext.assets = newAsset : playerAssets }
+              let updatedCtx = ctx { GameContext.mainCharacter = newChar }
+
+              _ <- GameContext.saveContext updatedCtx
+              systemMessage tuiOutputChannel $ "Asset adicionado: " <> assetName
+              atomically $ writeTChan tuiOutputChannel (CharacterUpdate newChar)
+              return True
+
+
+exploreAssets :: TChan GameOutput -> T.Text -> IO Bool
+exploreAssets tuiOutputChannel _input = do
+  assets <- AssetLoader.getAvailableAssets
+  if null assets
+    then do
+      systemMessage tuiOutputChannel "Nenhum asset carregado."
+      return True
+    else do
+      
+      atomically $ writeTChan tuiOutputChannel (AssetExploreRequest assets)
+      return True
+
+
+viewAsset :: TChan GameOutput -> T.Text -> IO Bool
+viewAsset tuiOutputChannel input = do
+  let assetName = T.strip input
+  if T.null assetName
+    then do
+      systemMessage tuiOutputChannel "Use: :viewasset <Nome do Asset>"
+      return True
+    else do
+      maybeAsset <- AssetLoader.findAssetByName assetName
+      case maybeAsset of
+        Nothing -> do
+          systemMessage tuiOutputChannel $ "Asset não encontrado: " <> assetName
+          return True
+        Just asset -> do
+          
+          atomically $ writeTChan tuiOutputChannel (AssetViewRequest asset)
+          return True
+
+
+showSkillDescription :: TChan GameOutput -> T.Text -> IO Bool
+showSkillDescription tuiOutputChannel input = do
+  
+  let parseQuotedArgs text =
+        let stripped = T.strip text
+            parts = T.splitOn "\" \"" stripped
+        in case parts of
+          [first, second] ->
+            let cleanFirst = T.strip $ T.replace "\"" "" first
+                cleanSecond = T.strip $ T.replace "\"" "" second
+            in Just (cleanFirst, cleanSecond)
+          _ -> Nothing
+
+  case parseQuotedArgs input of
+    Just (assetName, skillName) -> do
+      let cleanAssetName = T.strip assetName
+      let cleanSkillName = T.strip skillName
+
+      maybeAsset <- AssetLoader.findAssetByName cleanAssetName
+      case maybeAsset of
+        Nothing -> do
+          systemMessage tuiOutputChannel $ "Asset não encontrado: " <> cleanAssetName
+          return True
+        Just asset -> do
+          let skills = GameContext.assetSkills asset
+          case find (\skill -> GameContext.skillName skill == cleanSkillName) skills of
+            Nothing -> do
+              systemMessage tuiOutputChannel $ "Habilidade não encontrada: " <> cleanSkillName
+              return True
+            Just skill -> do
+              systemMessage tuiOutputChannel $ "=== " <> GameContext.skillName skill <> " ==="
+              systemMessage tuiOutputChannel $ GameContext.skillDescription skill
+              return True
+    Nothing -> do
+      systemMessage tuiOutputChannel "Erro ao processar comando de habilidade."
+      return True
+
+
 applyResourceDelta :: TChan GameOutput -> T.Text -> Int -> IO ()
 applyResourceDelta tuiOutputChannel resourceName delta = do
   let command = resourceName <> ":" <> deltaText
@@ -555,12 +930,11 @@ applyResourceDelta tuiOutputChannel resourceName delta = do
       | delta >= 0 = "+" <> T.pack (show delta)
       | otherwise = T.pack (show delta)
 
--- | Queries oracle systems with optional specific values.
+
 oracleQuery :: TChan GameOutput -> T.Text -> IO Bool
-oracleQuery tuiOutputChannel input = do
-  if T.null (T.strip input)
-    then listOracles tuiOutputChannel
-    else queryOracle
+oracleQuery tuiOutputChannel input = if T.null (T.strip input)
+  then listOracles tuiOutputChannel
+  else queryOracle
   where
     queryOracle = do
       let (oracleName, maybeValue) = Parser.parseOracleQuery input
@@ -577,7 +951,7 @@ oracleQuery tuiOutputChannel input = do
           mapM_ (systemMessage outputChan . ("• " <>)) oracles
       return True
 
--- | Executes a random oracle roll and processes the result.
+
 rollOracleRandomly :: TChan GameOutput -> T.Text -> IO Bool
 rollOracleRandomly tuiOutputChannel oracleName = do
   result <- Oracle.rollOracle oracleName
@@ -600,35 +974,34 @@ rollOracleRandomly tuiOutputChannel oracleName = do
       executeOracleConsequences tuiOutputChannel oracleResult
       return True
 
--- | Executes an oracle query with a specific index value.
+
 rollOracleWithGivenValue :: TChan GameOutput -> T.Text -> T.Text -> IO Bool
-rollOracleWithGivenValue tuiOutputChannel oracleName valueText = do
-  case TR.decimal valueText of
-    Right (val, _) -> do
-      result <- Oracle.queryOracle oracleName val
-      case result of
-        Left err -> do
-          systemMessage tuiOutputChannel $ "Erro no oráculo: " <> T.pack (show err)
-          return True
-        Right oracleResult -> do
-          let formattedResult =
-                T.pack $
-                  "[*] Oráculo: "
-                    ++ T.unpack (Oracle.resultOracle oracleResult)
-                    ++ " (Índice "
-                    ++ show (Oracle.resultRoll oracleResult)
-                    ++ "):\n"
-                    ++ "-> "
-                    ++ T.unpack (Oracle.resultText oracleResult)
+rollOracleWithGivenValue tuiOutputChannel oracleName valueText = case TR.decimal valueText of
+  Right (val, _) -> do
+    result <- Oracle.queryOracle oracleName val
+    case result of
+      Left err -> do
+        systemMessage tuiOutputChannel $ "Erro no oráculo: " <> T.pack (show err)
+        return True
+      Right oracleResult -> do
+        let formattedResult =
+              T.pack $
+                "[*] Oráculo: "
+                  ++ T.unpack (Oracle.resultOracle oracleResult)
+                  ++ " (Índice "
+                  ++ show (Oracle.resultRoll oracleResult)
+                  ++ "):\n"
+                  ++ "-> "
+                  ++ T.unpack (Oracle.resultText oracleResult)
 
-          _ <- process tuiOutputChannel AddStoryLog formattedResult
-          executeOracleConsequences tuiOutputChannel oracleResult
-          return True
-    Left _ -> do
-      systemMessage tuiOutputChannel "Valor inválido para consulta direta."
-      return True
+        _ <- process tuiOutputChannel AddStoryLog formattedResult
+        executeOracleConsequences tuiOutputChannel oracleResult
+        return True
+  Left _ -> do
+    systemMessage tuiOutputChannel "Valor inválido para consulta direta."
+    return True
 
--- | Executes structured consequences from oracle results.
+
 executeOracleConsequences :: TChan GameOutput -> Oracle.OracleResult -> IO ()
 executeOracleConsequences tuiOutputChannel result = do
   let structuredConsequences = Oracle.resultConsequences result
@@ -637,7 +1010,7 @@ executeOracleConsequences tuiOutputChannel result = do
     for_ maybeCtx $ \ctx ->
       processConsequences tuiOutputChannel structuredConsequences ctx
 
--- | Displays help information for game commands and topics.
+
 helpCommand :: TChan GameOutput -> T.Text -> IO Bool
 helpCommand tuiOutputChannel input = do
   let topic = T.strip input
@@ -654,10 +1027,9 @@ helpCommand tuiOutputChannel input = do
         systemMessage tuiOutputChannel "Tópicos disponíveis: moves, progress, oracle, chaining, character"
   return True
 
--- | Creates a new vow (Ironsworn progress track).
+
 swearVow :: TChan GameOutput -> T.Text -> IO Bool
-swearVow tuiOutputChannel input = withContext $ \ctx -> do
-  maybe handleParseError (processVow ctx) (Parser.parseQuotedString input)
+swearVow tuiOutputChannel input = withContext $ \ctx -> maybe handleParseError (processVow ctx) (Parser.parseQuotedString input)
   where
     handleParseError = systemMessage tuiOutputChannel (T.pack (C.msgVowUsage C.moveMessages)) >> return True
     processVow ctx (vowName, rest) = maybe (handleInvalidRank rest) (createVow ctx vowName) (Parser.parseRank (T.strip rest))
@@ -674,10 +1046,9 @@ swearVow tuiOutputChannel input = withContext $ \ctx -> do
       _ <- process tuiOutputChannel AddStoryLog formattedMsg
       return True
 
--- | Creates a new combat progress track.
+
 createCombatTrack :: TChan GameOutput -> T.Text -> IO Bool
-createCombatTrack tuiOutputChannel input = withContext $ \ctx -> do
-  maybe handleParseError (processCombat ctx) (Parser.parseQuotedString input)
+createCombatTrack tuiOutputChannel input = withContext $ \ctx -> maybe handleParseError (processCombat ctx) (Parser.parseQuotedString input)
   where
     handleParseError = systemMessage tuiOutputChannel (T.pack (C.msgCombatTrackUsage C.moveMessages)) >> return True
     processCombat ctx (enemyName, rest) = maybe (handleInvalidRank rest) (createCombat ctx enemyName) (Parser.parseRank (T.strip rest))
@@ -692,14 +1063,13 @@ createCombatTrack tuiOutputChannel input = withContext $ \ctx -> do
       _ <- GameContext.saveContext updatedCtx
       let formattedMsg = T.pack $ C.formatCombatTrackCreated C.moveMessages enemyName (T.unpack $ Parser.rankToText rank) ticks
       _ <- process tuiOutputChannel AddStoryLog formattedMsg
+
       
-      -- Sincroniza track de combate em modo multiplayer
-      when (GameContext.isMultiplayer updatedCtx) $ do
-        syncProgressTrack tuiOutputChannel updatedCtx enemyName track
-      
+      when (GameContext.isMultiplayer updatedCtx) $ syncProgressTrack tuiOutputChannel updatedCtx enemyName track
+
       return True
 
--- | Marks progress on an existing progress track.
+
 markProgress :: TChan GameOutput -> T.Text -> IO Bool
 markProgress tuiOutputChannel input = withContext $ \ctx -> do
   let trackName = T.strip input
@@ -728,25 +1098,24 @@ markProgress tuiOutputChannel input = withContext $ \ctx -> do
                   <> T.pack (show ticks)
                   <> "/40 ticks)"
           _ <- process tuiOutputChannel AddStoryLog msg
+
           
-          -- Sincroniza track em modo multiplayer
-          when (GameContext.isMultiplayer updatedCtx) $ do
-            case Progress.trackType track of
-              Progress.Combat -> syncProgressTrack tuiOutputChannel updatedCtx name updatedTrack
-              Progress.Journey -> syncProgressTrack tuiOutputChannel updatedCtx name updatedTrack
-              Progress.Vow -> do
-                -- Verifica se é shared vow (todos os vows em multiplayer são compartilhados)
-                let oldTicks = Progress.trackTicks track
-                let newTicks = Progress.trackTicks updatedTrack
-                when (newTicks > oldTicks) $ do
-                  syncSharedVowProgress tuiOutputChannel updatedCtx name (newTicks - oldTicks)
-              _ -> return ()
-          
+          when (GameContext.isMultiplayer updatedCtx) $ case Progress.trackType track of
+            Progress.Combat -> syncProgressTrack tuiOutputChannel updatedCtx name updatedTrack
+            Progress.Journey -> syncProgressTrack tuiOutputChannel updatedCtx name updatedTrack
+            Progress.Vow -> do
+              
+              let oldTicks = Progress.trackTicks track
+              let newTicks = Progress.trackTicks updatedTrack
+              when (newTicks > oldTicks) $ do
+                syncSharedVowProgress tuiOutputChannel updatedCtx name (newTicks - oldTicks)
+            _ -> return ()
+
           return True
 
     nonEmpty s = if T.null s then Nothing else Just s
 
--- | Executes a progress roll to attempt completing a progress track.
+
 rollProgress :: TChan GameOutput -> T.Text -> IO Bool
 rollProgress tuiOutputChannel input = withContext $ \ctx -> do
   let trackName = T.strip input
@@ -767,12 +1136,11 @@ rollProgress tuiOutputChannel input = withContext $ \ctx -> do
           finalCtx <- applyExperienceGain updatedCtx (Progress.executionExperienceGained executionResult)
           _ <- GameContext.saveContext finalCtx
           forM_ (Progress.executionSystemMessage executionResult) (systemMessage tuiOutputChannel)
+
           
-          -- Sincroniza shared vow quando completado
-          when (GameContext.isMultiplayer finalCtx && Progress.trackType track == Progress.Vow && Progress.executionExperienceGained executionResult > 0) $ do
-            syncSharedVowCompleted tuiOutputChannel finalCtx name (Progress.executionExperienceGained executionResult)
-            -- Host também recebe experiência automaticamente (clientes recebem via broadcast)
-          
+          when (GameContext.isMultiplayer finalCtx && Progress.trackType track == Progress.Vow && Progress.executionExperienceGained executionResult > 0) $ syncSharedVowCompleted tuiOutputChannel finalCtx name (Progress.executionExperienceGained executionResult)
+            
+
           return True
 
     applyExperienceGain ctx expGained
@@ -784,19 +1152,18 @@ rollProgress tuiOutputChannel input = withContext $ \ctx -> do
 
     nonEmpty s = if T.null s then Nothing else Just s
 
--- | Displays all active progress tracks.
+
 showTracks :: TChan GameOutput -> T.Text -> IO Bool
 showTracks tuiOutputChannel _ = withContext $ \ctx -> do
   let tracks = GameContext.progressTracks ctx
   if null tracks
-    then do
-      systemMessage tuiOutputChannel $ T.pack (C.msgNoTracksActive C.moveMessages)
+    then systemMessage tuiOutputChannel $ T.pack (C.msgNoTracksActive C.moveMessages)
     else do
       systemMessage tuiOutputChannel $ T.pack (C.msgTracksHeader C.moveMessages)
       mapM_ (systemMessage tuiOutputChannel . Parser.formatProgressTrack) tracks
   return True
 
--- | Abandons and removes a progress track from the character context.
+
 abandonTrack :: TChan GameOutput -> T.Text -> IO Bool
 abandonTrack tuiOutputChannel input = withContext $ \ctx -> do
   let trackName = T.strip input
@@ -817,7 +1184,7 @@ abandonTrack tuiOutputChannel input = withContext $ \ctx -> do
 
     nonEmpty s = if T.null s then Nothing else Just s
 
--- | Manages character bonds (relationships with people, communities, and places).
+
 bondCommand :: TChan GameOutput -> T.Text -> IO Bool
 bondCommand tuiOutputChannel input = do
   _ <- processBondCommand maybeValidCommand >>= logCommandResponse maybeValidCommand
@@ -834,7 +1201,7 @@ bondCommand tuiOutputChannel input = do
     logCommandResponse _ (Left _) = systemMessage tuiOutputChannel "Erro desconhecido ao processar comando de bond."
     logCommandResponse _ (Right r) = systemMessage tuiOutputChannel (r & GameContext.systemMessage)
 
--- | Adds a bonus to the character's active bonuses.
+
 addBonusCommand :: TChan GameOutput -> T.Text -> IO Bool
 addBonusCommand tuiOutputChannel input = withContext $ \ctx -> do
   case Parser.parseBonusCommand input of
@@ -843,7 +1210,7 @@ addBonusCommand tuiOutputChannel input = withContext $ \ctx -> do
       systemMessage tuiOutputChannel "Tipos: nextroll, nextmove:<nome>, persistent"
       systemMessage tuiOutputChannel "Exemplos:"
       systemMessage tuiOutputChannel "  :bonus nextroll +1 \"Preparado\""
-      systemMessage tuiOutputChannel "  :bonus nextmove:FaceDanger +2 \"Vantagem\""
+      systemMessage tuiOutputChannel "  :bonus nextmove:EnfrentarPerigo +2 \"Vantagem\""
       systemMessage tuiOutputChannel "  :bonus persistent +1 \"Bônus permanente\""
       return True
     Just bonus -> do
@@ -862,7 +1229,7 @@ addBonusCommand tuiOutputChannel input = withContext $ \ctx -> do
           <> bonusTypeStr
       return True
 
--- | Inicia uma sessão multiplayer como host
+
 hostSession :: TChan GameOutput -> T.Text -> IO Bool
 hostSession tuiOutputChannel _input = do
   maybeCtx <- GameContext.getCurrentContext
@@ -874,39 +1241,39 @@ hostSession tuiOutputChannel _input = do
       let playerName = GameContext.getCharacterName ctx
       let characterName = GameContext.name (GameContext.mainCharacter ctx)
 
-      -- Inicia servidor com canal TUI
+      
       result <- NetworkServer.startServer NetworkServer.defaultPort playerName characterName (Just tuiOutputChannel)
       case result of
         Left err -> do
           systemMessage tuiOutputChannel $ "Erro ao iniciar servidor: " <> T.pack err
           return True
         Right serverState -> do
-          -- Salva estado de rede
+          
           NetworkState.setNetworkState (NetworkState.ServerState serverState)
 
-          -- Atualiza contexto para modo multiplayer
+          
           let updatedCtx =
                 ctx
                   { GameContext.isMultiplayer = True,
                     GameContext.multiplayerSessionId = Just (T.pack $ "session-" ++ show NetworkServer.defaultPort)
                   }
           void $ GameContext.saveContext updatedCtx
-          -- Atualiza o contexto no MVar também (saveContext só salva no arquivo)
+          
           cache <- GameContext.getContextCache
           modifyMVar_ cache $ \_ -> return (Just updatedCtx)
 
-          -- Obtém IP local
+          
           maybeIP <- NetworkServer.getLocalIP
           let ipStr = fromMaybe "localhost" maybeIP
 
-          -- Mostra informações na TUI
+          
           systemMessage tuiOutputChannel $ "Servidor iniciado na porta " <> T.pack (show NetworkServer.defaultPort)
           systemMessage tuiOutputChannel $ "IP: " <> T.pack ipStr <> ":" <> T.pack (show NetworkServer.defaultPort)
           systemMessage tuiOutputChannel "Aguardando conexões..."
 
           return True
 
--- | Conecta a uma sessão multiplayer
+
 connectSession :: TChan GameOutput -> T.Text -> IO Bool
 connectSession tuiOutputChannel input = do
   maybeCtx <- GameContext.getCurrentContext
@@ -915,40 +1282,40 @@ connectSession tuiOutputChannel input = do
       systemMessage tuiOutputChannel "Erro: Nenhum personagem carregado. Use :load para carregar um personagem."
       return True
     Just ctx -> do
-      -- Parse do input (formato: "ip:port" ou "ip port")
+      
       let parts = T.splitOn ":" (T.strip input)
       if length parts == 2
         then do
           let host = T.unpack (head parts)
           let portStr = parts !! 1
-          case TR.decimal portStr of
+          case TR.decimal portStr :: Either String (Integer, T.Text) of
             Right (port, _) -> do
               let playerName = GameContext.getCharacterName ctx
               let characterName = GameContext.name (GameContext.mainCharacter ctx)
 
-              -- Conecta ao servidor
+              
               result <- NetworkClient.connectToServer host (fromIntegral port) playerName characterName
               case result of
                 Left err -> do
                   systemMessage tuiOutputChannel $ "Erro ao conectar: " <> T.pack err
                   return True
                 Right clientState -> do
-                  -- Salva estado de rede
+                  
                   NetworkState.setNetworkState (NetworkState.ClientState clientState)
 
-                  -- Atualiza contexto para modo multiplayer
+                  
                   let updatedCtx =
                         ctx
                           { GameContext.isMultiplayer = True,
                             GameContext.multiplayerSessionId = Just (T.pack $ host ++ ":" ++ show port)
                           }
+
                   
-                  -- CORRIGIDO: Atualiza o cache em memória primeiro, depois salva no arquivo
                   cache <- GameContext.getContextCache
                   modifyMVar_ cache $ \_ -> return (Just updatedCtx)
                   void $ GameContext.saveContext updatedCtx
 
-                  -- Inicia loop de recepção
+                  
                   NetworkClient.startReceiveLoop clientState tuiOutputChannel
 
                   systemMessage tuiOutputChannel "Conectado ao servidor!"
@@ -960,7 +1327,7 @@ connectSession tuiOutputChannel input = do
           systemMessage tuiOutputChannel "Formato inválido. Use: :connect <ip:port>"
           return True
 
--- | Desconecta da sessão multiplayer
+
 disconnectSession :: TChan GameOutput -> T.Text -> IO Bool
 disconnectSession tuiOutputChannel _input = do
   networkState <- NetworkState.getNetworkState
@@ -989,20 +1356,18 @@ disconnectSession tuiOutputChannel _input = do
                 }
         void $ GameContext.saveContext updatedCtx
       systemMessage tuiOutputChannel "Desconectado do servidor."
-    NetworkState.NoNetworkState -> do
-      systemMessage tuiOutputChannel "Não há sessão multiplayer ativa."
+    NetworkState.NoNetworkState -> systemMessage tuiOutputChannel "Não há sessão multiplayer ativa."
   return True
 
--- | Cria um voto compartilhado
+
 sharedVow :: TChan GameOutput -> T.Text -> IO Bool
 sharedVow tuiOutputChannel input = withContext $ \ctx -> do
-  -- Verifica se está em modo multiplayer
+  
   if not (GameContext.isMultiplayer ctx)
     then do
       systemMessage tuiOutputChannel "Shared vows só podem ser criados em modo multiplayer."
       return True
-    else do
-      maybe handleParseError (processSharedVow ctx) (Parser.parseQuotedString input)
+    else maybe handleParseError (processSharedVow ctx) (Parser.parseQuotedString input)
   where
     handleParseError = systemMessage tuiOutputChannel (T.pack (C.msgVowUsage C.moveMessages)) >> return True
     processSharedVow ctx (vowName, rest) = maybe (handleInvalidRank rest) (createSharedVow ctx vowName) (Parser.parseRank (T.strip rest))
@@ -1017,14 +1382,14 @@ sharedVow tuiOutputChannel input = withContext $ \ctx -> do
       _ <- GameContext.saveContext updatedCtx
       let formattedMsg = T.pack $ C.formatVowCreated C.moveMessages vowName (T.unpack $ Parser.rankToText rank) ticks
       _ <- process tuiOutputChannel AddStoryLog formattedMsg
+
       
-      -- Faz broadcast do shared vow
       syncSharedVowCreated tuiOutputChannel updatedCtx vowName track
-      
+
       return True
 
--- | Aceita uma conexão pendente
--- Se não fornecer nome, aceita a primeira conexão pendente
+
+
 acceptConnection :: TChan GameOutput -> T.Text -> IO Bool
 acceptConnection tuiOutputChannel input = do
   networkState <- NetworkState.getNetworkState
@@ -1037,17 +1402,16 @@ acceptConnection tuiOutputChannel input = do
           if T.null playerName
             then systemMessage tuiOutputChannel "Nenhuma conexão pendente para aceitar."
             else systemMessage tuiOutputChannel $ "Nenhuma conexão pendente encontrada para " <> playerName
-        Just conn -> do
-          systemMessage tuiOutputChannel $ "Conexão aceita: " <> NetworkTypes.connPlayerName conn <> " (" <> NetworkTypes.connCharacterName conn <> ")"
-          -- receiveLoop já foi iniciado pelo approveConnection
-          -- Lista de jogadores será atualizada automaticamente pelo acceptConnection
+        Just conn -> systemMessage tuiOutputChannel $ "Conexão aceita: " <> NetworkTypes.connPlayerName conn <> " (" <> NetworkTypes.connCharacterName conn <> ")"
+          
+          
       return True
     _ -> do
       systemMessage tuiOutputChannel "Apenas o host pode aceitar conexões."
       return True
 
--- | Rejeita uma conexão pendente
--- Se não fornecer nome, rejeita a primeira conexão pendente
+
+
 rejectConnection :: TChan GameOutput -> T.Text -> IO Bool
 rejectConnection tuiOutputChannel input = do
   networkState <- NetworkState.getNetworkState
@@ -1061,15 +1425,15 @@ rejectConnection tuiOutputChannel input = do
       systemMessage tuiOutputChannel "Apenas o host pode rejeitar conexões."
       return True
 
--- | Sincroniza um progress track em modo multiplayer
+
 syncProgressTrack :: TChan GameOutput -> GameContext.Context -> T.Text -> Progress.ProgressTrack -> IO ()
-syncProgressTrack tuiOutputChannel ctx trackName track = do
-  -- Apenas sincroniza Combat e Journey
+syncProgressTrack _ ctx trackName track = do
+  
   when (Progress.trackType track == Progress.Combat || Progress.trackType track == Progress.Journey) $ do
     networkState <- NetworkState.getNetworkState
     let playerName = GameContext.getCharacterName ctx
-    let trackData = TE.decodeUtf8 $ BL.toStrict (Aeson.encode track)  -- Serializa track para JSON string
-    
+    let trackData = TE.decodeUtf8 $ BL.toStrict (Aeson.encode track)  
+
     case networkState of
       NetworkState.ServerState serverState -> do
         let msg = NetworkProtocol.ProgressTrackSync playerName trackName trackData

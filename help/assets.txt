@@ -1,0 +1,115 @@
+SOLORPG - ASSETS (TALENTOS E HABILIDADES)
+Sistema de Assets baseado em Ironsworn
+
+═══════════════════════════════════════════════════════════════
+EXPLORAR E VISUALIZAR ASSETS
+═══════════════════════════════════════════════════════════════
+
+NAVEGAÇÃO DE ASSETS:
+  :exploreassets      - Menu interativo com todos os assets disponíveis
+                       Use ↑/↓ para navegar, ENTER para ver detalhes
+                       ESC para fechar o menu
+
+  :viewasset <Nome>   - Visualização detalhada de um asset específico
+                       Exemplo: :viewasset Augure
+                       Use ↑/↓ para navegar entre habilidades
+                       ENTER para ver descrição completa da habilidade
+                       ESC para fechar
+
+INTERFACE VISUAL:
+  * = habilidade já habilitada no seu personagem
+  - = habilidade disponível mas não habilitada
+
+═══════════════════════════════════════════════════════════════
+GERENCIAR ASSETS DO PERSONAGEM
+═══════════════════════════════════════════════════════════════
+
+ADQUIRIR ASSETS:
+  :pickasset <Nome>   - Adquire asset gastando 2 XP
+                       Exemplo: :pickasset Augure
+                       Primeira habilidade é habilitada automaticamente
+
+  :addasset <Nome>    - Adiciona asset gratuitamente (casos especiais)
+                       Exemplo: :addasset Corvo
+                       Para correções ou assets gratuitos
+
+VISUALIZAR ASSETS DO PERSONAGEM:
+  - Use TAB para navegar até o painel "Cartas" na TUI
+  - Seus assets aparecem listados por nome
+  - Use ↑/↓ para navegar entre seus assets
+  - ENTER para ver detalhes e status das habilidades
+
+═══════════════════════════════════════════════════════════════
+CRIAÇÃO DE PERSONAGEM COM ASSETS
+═══════════════════════════════════════════════════════════════
+
+ASSETS INICIAIS:
+  :create <nome> assets:<Asset1>,<Asset2>,<Asset3> <atributos>
+  
+  Exemplo:
+  :create Eivor assets:Augure,Corvo,Cavalo iron:3 wits:2 heart:2
+
+  - Máximo de 3 assets iniciais
+  - Primeira habilidade de cada asset é habilitada automaticamente
+  - Assets inválidos são ignorados com aviso
+
+═══════════════════════════════════════════════════════════════
+PROGRESSÃO E MELHORIAS
+═══════════════════════════════════════════════════════════════
+
+MELHORAR ASSETS:
+  Use o movimento Advance para gastar XP estruturadamente:
+  :move advance
+
+  Opções disponíveis:
+  - Novo Asset (2 XP) - Adquire um asset completamente novo
+  - Melhorar Asset (1 XP) - Habilita próxima habilidade de um asset existente
+  - Aumentar Atributo (3 XP) - Melhora atributo permanentemente
+
+CONSEQUÊNCIAS AUTOMÁTICAS:
+  - ImproveAsset: Sistema escolhe automaticamente qual habilidade habilitar
+  - PickAsset: Apresenta menu de escolha de assets disponíveis
+
+═══════════════════════════════════════════════════════════════
+DETALHES TÉCNICOS
+═══════════════════════════════════════════════════════════════
+
+ESTRUTURA DE DADOS:
+  - Assets são carregados de arquivos JSON na pasta assets/
+  - Cada asset possui: tipo, nome, e lista de habilidades
+  - Cada habilidade possui: índice, nome e descrição completa
+  - Personagens guardam lista de assets possuídos e habilidades habilitadas
+
+NAVEGAÇÃO INTERATIVA:
+  - TAB: Alterna entre painéis (Log, Sistema, Cartas)
+  - ↑/↓: Navega dentro do painel focado
+  - ENTER: Seleciona/visualiza item
+  - ESC: Fecha menus e popups
+
+COMANDOS INTERNOS:
+  :showskill <Asset> <Habilidade> - Mostra descrição de habilidade específica
+                                   (usado automaticamente pela interface)
+
+═══════════════════════════════════════════════════════════════
+EXEMPLOS DE USO
+═══════════════════════════════════════════════════════════════
+
+1. EXPLORANDO ASSETS DISPONÍVEIS:
+   :exploreassets
+   [Navigate with ↑/↓, ENTER to view, ESC to close]
+
+2. VISUALIZANDO ASSET ESPECÍFICO:
+   :viewasset Augure
+   [Shows: - Presságio dos Corvos, - Guia da Jornada, - Ritual Aprimorado]
+   [Press ENTER on skill to see full description]
+
+3. CRIANDO PERSONAGEM COM ASSETS:
+   :create Ragnar assets:Augure,Corvo iron:3 edge:2
+   [Character created with 2 assets, first skill of each enabled]
+
+4. NAVEGANDO SEUS ASSETS:
+   [Press TAB until "Cartas" panel is focused]
+   [Use ↑/↓ to navigate through your assets]
+   [Press ENTER to view asset details with your progress]
+
+═══════════════════════════════════════════════════════════════

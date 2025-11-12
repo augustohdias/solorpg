@@ -11,7 +11,7 @@ ENTRADA NARRATIVA:
 
 COMANDOS DO SISTEMA:
   :help [tópico]     - Mostra ajuda geral ou de um tópico específico
-                      Tópicos: moves, progress, oracle, chaining, character
+                      Tópicos: moves, progress, oracle, chaining, character, assets
   :exit / :q / :quit - Encerra a sessão
   :show              - Mostra o log completo da sessão
 
@@ -20,8 +20,9 @@ PERSONAGEM
 ═══════════════════════════════════════════════════════════════
 
 CRIAR E CARREGAR:
-  :create <nome> [atributos]  - Cria novo personagem
+  :create <nome> [atributos] [assets]  - Cria novo personagem
                                 Exemplo: :create Eivor iron:3 edge:2 heart:4
+                                Com assets: :create Eivor assets:Augure,Corvo iron:3
   :load <nome>                 - Carrega personagem existente
   :char                        - Mostra ficha do personagem atual
 
@@ -48,64 +49,49 @@ VÍNCULOS (BONDS):
   :bond addcomm <nome>       - Adiciona vínculo com comunidade
   :bond note "<nome>" "<nota>" - Adiciona nota a um vínculo (append)
   :bond remove <nome>        - Remove um vínculo
-  :bond list "<nome>"        - Lista notas de um vínculo
 
-BÔNUS DE ROLAGEM:
-  :bonus <tipo> <valor> [descrição]  - Adiciona bônus de rolagem
-  
-  Tipos disponíveis:
-    nextroll              - Aplica na próxima rolagem qualquer
-    nextmove:<nome>        - Aplica no próximo move específico
-    persistent             - Bônus permanente (até removido)
-  
-  Exemplos:
-    :bonus nextroll +1 "Preparado"
-    :bonus nextmove:FaceDanger +2 "Vantagem"
-    :bonus persistent +1 "Bônus permanente"
+═══════════════════════════════════════════════════════════════
+ASSETS (TALENTOS E HABILIDADES)
+═══════════════════════════════════════════════════════════════
+
+EXPLORAR E VISUALIZAR:
+  :exploreassets      - Menu interativo com todos os assets
+  :viewasset <Nome>   - Detalhes de um asset específico
+
+GERENCIAR ASSETS:
+  :pickasset <Nome>   - Adquire asset gastando 2 XP
+  :addasset <Nome>    - Adiciona asset gratuitamente (casos especiais)
+
+PROGRESSÃO:
+  Use :move advance para gastar XP estruturadamente
+  Custos: Novo Asset (2 XP), Melhorar Asset (1 XP), Atributo (3 XP)
 
 ═══════════════════════════════════════════════════════════════
 DADOS E ROLAGENS
 ═══════════════════════════════════════════════════════════════
 
-ROLAGEM DE DADOS:
-  :r <espec> / :roll <espec>  - Rola dados
-                                Exemplo: :r 2d6,1d10 ou :roll 3d6
+ROLAGENS BÁSICAS:
+  :r <dados>         - Rola dados (ex: :r 1d6, :r 2d10, :r 1d6,2d10)
+  :roll <dados>      - Mesmo que :r
+  :challenge         - Rola 1d6,2d10 (action roll padrão)
 
-DESAFIO (IRONSWORN):
-  :challenge  - Rola desafio Ironsworn (1d6 + 2d10)
-               Avalia Strong Hit, Weak Hit ou Miss
+BÔNUS MANUAIS:
+  :bonus <tipo> <valor> [descrição]
+  Tipos: nextroll, nextmove:<nome>, persistent
+  Exemplo: :bonus nextroll +2 "Vantagem tática"
 
 ═══════════════════════════════════════════════════════════════
-MOVES (IRONSWORN)
+MOVES (MOVIMENTOS)
 ═══════════════════════════════════════════════════════════════
 
-EXECUTAR MOVE:
-  :move <nome> [stat]  - Executa um move de Ironsworn
-                         Stat é opcional (sistema detecta automaticamente)
-                         Exemplos:
-                           :move Face Danger edge
-                           :move Gather Information wits
-                           :move Strike
-                           :move Pay The Price
+EXECUTAR MOVES:
+  :move <nome> [stat] - Executa um movimento de Ironsworn
+                        Exemplo: :move "face danger" +edge
+                        Exemplo: :move "secure advantage" +shadow
 
-MOVES DISPONÍVEIS:
-  Adventure: Face Danger, Gather Information, Secure Advantage, 
-             Heal, Resupply, Make Camp, Swear Iron Vow, 
-             Undertake Journey, Reach Milestone
-  
-  Combat: Enter the Fray, Strike, Clash, Turn the Tide, End the Fight
-  
-  Suffer: Endure Harm, Face Death, Endure Stress, Face Desolation
-  
-  Bond: Forge a Bond, Test Your Bond, Aid Your Ally
-  
-  Social: Compel, Sojourn
-  
-  Fate: Pay The Price, Ask The Oracle
-
-RESULTADOS:
-  Strong Hit - Sucesso completo
-  Weak Hit   - Sucesso parcial
+AVALIAÇÃO AUTOMÁTICA:
+  Strong Hit - Sucesso total, todas as vantagens
+  Weak Hit   - Sucesso parcial, complicações
   Miss       - Falha, consequências aplicadas
 
 Consequências automáticas são aplicadas ao executar moves.
@@ -142,52 +128,45 @@ GERENCIAR TRACKS:
 ORÁCULOS
 ═══════════════════════════════════════════════════════════════
 
-CONSULTAR ORÁCULO:
-  :oracle                    - Lista todos os oráculos disponíveis
-  :oracle <nome>             - Consulta oráculo com rolagem automática
-                              Exemplo: :oracle PayThePrice
-  :oracle <nome> <valor>    - Consulta oráculo com valor específico
-                              Exemplo: :oracle PayThePrice 42
+USO DE ORÁCULOS:
+  :oracle                    - Lista oráculos disponíveis
+  :oracle "<nome>"           - Consulta oráculo (rolagem automática)
+  :oracle "<nome>" <valor>   - Consulta valor específico
 
-Oráculos podem ter consequências programáticas que são aplicadas
-automaticamente ao consultá-los.
-
-═══════════════════════════════════════════════════════════════
-NAVEGAÇÃO E INTERFACE
-═══════════════════════════════════════════════════════════════
-
-TECLAS:
-  Tab          - Alterna foco entre áreas de scroll
-  ↑↓           - Rola viewport focado
-  PgUp/PgDn    - Rola em páginas
-  ESC/Ctrl+C   - Sair
-
-ESCOLHAS DO JOGADOR:
-  Quando um move apresenta escolhas, use as teclas:
-  ↑↓ ou 1-9    - Seleciona opção
-  Enter         - Confirma escolha
-  ESC           - Cancela escolha
+ORÁCULOS COMUNS:
+  - "Pagar o Preço" - Para consequências de falha
+  - "Nomes Humanos" - Gera nomes de NPCs
+  - "Região" - Determina tipo de região
 
 ═══════════════════════════════════════════════════════════════
-SALVAMENTO
+FUNCIONALIDADES AVANÇADAS
 ═══════════════════════════════════════════════════════════════
 
-O contexto do personagem é salvo automaticamente quando você:
-  - Modifica atributos ou recursos
-  - Adiciona entrada narrativa ao log
-  - Executa moves ou consulta oráculos
+MULTIPLAYER:
+  :host              - Inicia sessão como host
+  :connect <ip:port> - Conecta a uma sessão
+  :disconnect        - Desconecta da sessão
+  :sharedvow "<nome>" <rank> - Cria voto compartilhado
+  :accept [jogador]  - Aceita conexão pendente
+  :reject [jogador]  - Rejeita conexão pendente
+
+INTERFACE:
+  - Use Tab para alternar entre painéis de log
+  - ESC fecha menus e popups
+  - ↑/↓ navega em menus
+  - Enter confirma seleções
   - Gerencia progress tracks ou bonds
 
 ═══════════════════════════════════════════════════════════════
 TÓPICOS DE AJUDA DISPONÍVEIS
 ═══════════════════════════════════════════════════════════════
 
-Use :help <tópico> para mais informações:
-
-  moves      - Lista completa de moves e como usá-los
+Para ajuda detalhada sobre tópicos específicos:
+  moves      - Lista completa de movimentos disponíveis
   progress   - Sistema de progress tracks e votos
   oracle     - Como usar oráculos
   chaining   - Encadeamento de consequências e escolhas
   character  - Gerenciamento completo de personagem
+  assets     - Sistema de talentos e habilidades (Assets)
 
 ═══════════════════════════════════════════════════════════════

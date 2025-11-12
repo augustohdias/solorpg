@@ -2,9 +2,8 @@
 module System.HelpSpec (spec) where
 
 import Test.Hspec
-import qualified Data.Text as T
 import qualified System.Help as Help
-import System.Directory (createDirectoryIfMissing, removeFile, doesFileExist)
+import System.Directory (createDirectoryIfMissing, removeFile)
 import System.FilePath ((</>))
 
 spec :: Spec
@@ -35,7 +34,7 @@ spec = describe "System.Help" $ do
       result <- Help.showHelp testDir
       result `shouldContain` "General help content"
       
-      -- Cleanup
+      
       removeFile (testDir </> "general.txt")
     
     it "returns error message when help file doesn't exist" $ do
@@ -51,5 +50,5 @@ spec = describe "System.Help" $ do
       result <- Help.showTopicHelp testDir Help.Moves
       result `shouldContain` "Moves help content"
       
-      -- Cleanup
+      
       removeFile (testDir </> "moves.txt")

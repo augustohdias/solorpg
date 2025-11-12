@@ -101,7 +101,7 @@ spec = describe "System.Network.Protocol" $ do
       let result = Protocol.decodeMessageWithRest encoded
       case result of
         Just (decodedMsg, _rest) -> decodedMsg `shouldBe` msg
-        Nothing -> return ()  -- A fun??o pode ter limita??es conhecidas
+        Nothing -> return ()  
     
     it "returns Nothing for invalid JSON" $ do
       let invalid = BLC.pack "not valid json"

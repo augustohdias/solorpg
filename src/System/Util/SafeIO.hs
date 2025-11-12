@@ -15,13 +15,13 @@ import Control.Exception (catch, SomeException)
 import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.Map.Strict as Map
 
--- | Global map of file locks
--- Using unsafePerformIO is safe here because we only initialize once
+
+
 {-# NOINLINE fileLocks #-}
 fileLocks :: MVar (Map.Map FilePath (MVar ()))
 fileLocks = unsafePerformIO (newMVar Map.empty)
 
--- | Get or create a lock for a specific file
+
 getFileLock :: FilePath -> IO (MVar ())
 getFileLock path = do
     locks <- takeMVar fileLocks
@@ -34,8 +34,8 @@ getFileLock path = do
             putMVar fileLocks (Map.insert path newLock locks)
             return newLock
 
--- | Safely write to a file with exclusive locking
--- Prevents concurrent writes to the same file
+
+
 safeWriteFile :: FilePath -> BL.ByteString -> IO (Either SomeException ())
 safeWriteFile path contents = do
     lock <- getFileLock path
@@ -44,8 +44,8 @@ safeWriteFile path contents = do
               (\e -> return (Left (e :: SomeException)))
     return result
 
--- | Safely read from a file
--- Multiple concurrent reads are allowed, but reads are protected from concurrent writes
+
+
 safeReadFile :: FilePath -> IO (Either SomeException BL.ByteString)
 safeReadFile path = do
     lock <- getFileLock path

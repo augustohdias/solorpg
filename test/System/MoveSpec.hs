@@ -5,7 +5,6 @@ import Test.Hspec
 import qualified Data.Text as T
 import qualified System.Move as Move
 import qualified System.GameContext as GameContext
-import qualified System.Dice as Dice
 import qualified System.ConsequenceContract as Consequence
 
 spec :: Spec
@@ -107,7 +106,7 @@ spec = describe "System.Move" $ do
       let attrs = GameContext.Attributes 3 2 2 1 2
       let resources = GameContext.Resources 5 5 5 0 0
       
-      -- Strong hit: action die (5) + iron (3) = 8, beats both challenge dice (3, 4)
+      
       consequences <- Move.executeMoveWithRoll 
         Consequence.FaceDanger 
         (Just Move.Iron) 
@@ -116,7 +115,7 @@ spec = describe "System.Move" $ do
         attrs 
         resources
       
-      -- Should contain narrative with roll info
+      
       any (\c -> case c of
             Consequence.Narrative txt -> T.isInfixOf "Action Die: 5" txt
             _ -> False) consequences `shouldBe` True

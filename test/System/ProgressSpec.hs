@@ -53,7 +53,7 @@ spec = describe "System.Progress" $ do
     it "adds ticks based on rank" $ do
       let track = Progress.newProgressTrack "Test" Progress.Vow Progress.Dangerous
       updated <- Progress.markProgress track
-      Progress.trackTicks updated `shouldBe` 8  -- Dangerous rank = 8 ticks
+      Progress.trackTicks updated `shouldBe` 8  
     
     it "does not exceed maximum ticks" $ do
       let track = (Progress.newProgressTrack "Test" Progress.Vow Progress.Dangerous)

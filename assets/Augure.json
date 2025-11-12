@@ -4,14 +4,17 @@
     "skills": [
         {
             "index": 1,
+            "skillName": "Saltatio Corvorum",
             "description": "Quando você invocar um bando de corvos e fizer apenas uma pergunta, role +centelha (wits). Com um sucesso decisivo, você interpreta o seu chamado como um presságio útil. Imagine a resposta  (faça o movimento \"Perguntar ao Oráculo\" se não tiver certeza) e receba +2 em Momentum. Com um sucesso parcial, os corvos ignoram a sua pergunta e oferecem uma pista para um problema não relacionado ou uma oportunidade neste assunto. Imagine o que você aprende (faça o movimento \"Perguntar ao Oráculo\" se não tiver certeza) e receba +1 em Momentum."
         },
         {
             "index": 2,
+            "skillName": "Iter Dux",
             "description": "Como descrito acima e os corvos também ajudarão guiando-o no caminho certo. Com um sucesso, adicione +1 no próximo segmento quando fizer o movimento \"Empreender uma Jornada\"."
         },
         {
             "index": 3,
+            "skillName": "Orchestra Corvorum",
             "description": "Quando realizar este ritual, adicione +1 e receba +1 em Momentum com um sucesso."
         }
     ],

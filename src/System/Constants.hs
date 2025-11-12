@@ -8,7 +8,7 @@
      - Evitar duplicação de código
 -}
 module System.Constants
-  ( -- * Language Support
+  ( 
     Language(..)
   , getMessages
   , getMoveMessages
@@ -18,58 +18,58 @@ module System.Constants
   , getChallengeInterpretation
   , currentLanguage
   
-    -- * Mensagens do Sistema
+    
   , Messages(..)
   , messages
   , messagesEN
   
-    -- * Labels de Atributos e Recursos
+    
   , AttributeLabels(..)
   , attributeLabels
   , ResourceLabels(..)
   , resourceLabels
 
-    -- * Configurações
+    
   , Config(..)
   , defaultConfig
 
-    -- * Constantes de Jogo
+    
   , GameConstants(..)
   , gameConstants
 
-    -- * Mensagens de Moves
+    
   , MoveMessages(..)
   , moveMessages
 
-    -- * Help Messages
+    
   , HelpMessages(..)
   , helpMessages
 
-    -- * Error Messages
+    
   , ErrorMessages(..)
   , errorMessages
 
-    -- * Progress Interpretation
+    
   , ProgressInterpretation(..)
   , progressInterpretation
 
-    -- * Challenge Interpretation
+    
   , ChallengeInterpretation(..)
   , challengeInterpretation
 
-    -- * Character Display
+    
   , CharacterDisplay(..)
   , characterDisplay
   ) where
 
 import qualified Data.Text as T
 
--- | Idioma do sistema
+
 data Language = PT | EN deriving (Eq, Show)
 
--- | Mensagens do sistema
+
 data Messages = Messages
-  { -- Mensagens de sucesso
+  { 
     msgCharacterCreated :: T.Text
   , msgCharacterLoaded :: T.Text
   , msgSessionResumed :: T.Text
@@ -78,7 +78,7 @@ data Messages = Messages
   , msgSessionStarted :: T.Text
   , msgSessionEnded :: T.Text
 
-    -- Mensagens de erro
+    
   , msgNoCharacterLoaded :: T.Text
   , msgCharacterNameRequired :: T.Text
   , msgInvalidFormat :: T.Text
@@ -87,26 +87,26 @@ data Messages = Messages
   , msgErrorCreating :: T.Text
   , msgErrorLoading :: T.Text
 
-    -- Mensagens informativas
+    
   , msgDiceRolled :: T.Text
   , msgLogsLoaded :: T.Text
   , msgLogsHeader :: T.Text
 
-    -- Cabeçalhos
+    
   , msgGameHeader :: T.Text
   , msgGameWelcome :: T.Text
   , msgGameSeparator :: T.Text
 
-    -- Seções da ficha
+    
   , msgAttributesSection :: T.Text
   , msgResourcesSection :: T.Text
   , msgEventsSection :: T.Text
   }
 
--- | Mensagens em Português (padrão)
+
 messages :: Messages
 messages = Messages
-  { -- Sucesso
+  { 
     msgCharacterCreated = "Personagem criado: "
   , msgCharacterLoaded = "Personagem carregado: "
   , msgSessionResumed = "Sessão retomada com "
@@ -115,7 +115,7 @@ messages = Messages
   , msgSessionStarted = "Nova sessão iniciada"
   , msgSessionEnded = "Sessão encerrada"
   
-    -- Erros
+    
   , msgNoCharacterLoaded = "Nenhum personagem carregado"
   , msgCharacterNameRequired = "Erro: Nome do personagem não fornecido"
   , msgInvalidFormat = "Formato inválido"
@@ -124,26 +124,26 @@ messages = Messages
   , msgErrorCreating = "Erro ao criar personagem: "
   , msgErrorLoading = "Erro ao carregar personagem: "
   
-    -- Informativas
+    
   , msgDiceRolled = "Dados rolados: "
   , msgLogsLoaded = "Carregados "
   , msgLogsHeader = "Logs:"
   
-    -- Cabeçalhos
+    
   , msgGameHeader = "================ SoloRPG ================"
   , msgGameWelcome = "Bem-vindo ao SoloRPG! Um RPG solo baseado em Ironsworn."
   , msgGameSeparator = "========================================="
   
-    -- Seções
+    
   , msgAttributesSection = "\nATRIBUTOS:"
   , msgResourcesSection = "\nRECURSOS:"
   , msgEventsSection = "\nÚLTIMOS EVENTOS:"
   }
 
--- | Mensagens em Inglês
+
 messagesEN :: Messages
 messagesEN = Messages
-  { -- Success
+  { 
     msgCharacterCreated = "Character created: "
   , msgCharacterLoaded = "Character loaded: "
   , msgSessionResumed = "Session resumed with "
@@ -152,7 +152,7 @@ messagesEN = Messages
   , msgSessionStarted = "New session started"
   , msgSessionEnded = "Session ended"
   
-    -- Errors
+    
   , msgNoCharacterLoaded = "No character loaded"
   , msgCharacterNameRequired = "Error: Character name not provided"
   , msgInvalidFormat = "Invalid format"
@@ -161,23 +161,23 @@ messagesEN = Messages
   , msgErrorCreating = "Error creating character: "
   , msgErrorLoading = "Error loading character: "
   
-    -- Informative
+    
   , msgDiceRolled = "Dice rolled: "
   , msgLogsLoaded = "Loaded "
   , msgLogsHeader = "Logs:"
   
-    -- Headers
+    
   , msgGameHeader = "================ SoloRPG ================"
   , msgGameWelcome = "Welcome to SoloRPG! A solo RPG based on Ironsworn."
   , msgGameSeparator = "========================================="
   
-    -- Sections
+    
   , msgAttributesSection = "\nATTRIBUTES:"
   , msgResourcesSection = "\nRESOURCES:"
   , msgEventsSection = "\nRECENT EVENTS:"
   }
 
--- | Labels dos atributos
+
 data AttributeLabels = AttributeLabels
   { labelIron :: T.Text
   , labelEdge :: T.Text
@@ -186,7 +186,7 @@ data AttributeLabels = AttributeLabels
   , labelWits :: T.Text
   }
 
--- | Labels padrão dos atributos
+
 attributeLabels :: AttributeLabels
 attributeLabels = AttributeLabels
   { labelIron = "Iron (Ferro)"
@@ -196,7 +196,7 @@ attributeLabels = AttributeLabels
   , labelWits = "Wits (Astúcia)"
   }
 
--- | Labels dos recursos
+
 data ResourceLabels = ResourceLabels
   { labelSpirit :: T.Text
   , labelHealth :: T.Text
@@ -205,7 +205,7 @@ data ResourceLabels = ResourceLabels
   , labelExperience :: T.Text
   }
 
--- | Labels padrão dos recursos
+
 resourceLabels :: ResourceLabels
 resourceLabels = ResourceLabels
   { labelSpirit = "Spirit (Espírito)"
@@ -215,17 +215,17 @@ resourceLabels = ResourceLabels
   , labelExperience = "Experience (XP)"
   }
 
--- | Configurações do jogo
+
 data Config = Config
-  { -- Arquivos
+  { 
     configSessionLogFile :: FilePath
   , configContextFileExtension :: String
 
-    -- Limites
+    
   , configMaxCharacterNameLength :: Int
   , configMaxEventsToShow :: Int
 
-    -- Valores padrão
+    
   , configDefaultAttributeValue :: Int
   , configDefaultResourceSpirit :: Int
   , configDefaultResourceHealth :: Int
@@ -234,18 +234,18 @@ data Config = Config
   , configDefaultResourceExperience :: Int
   }
 
--- | Configuração padrão do jogo
+
 defaultConfig :: Config
 defaultConfig = Config
-  { -- Arquivos
+  { 
     configSessionLogFile = "session.log"
   , configContextFileExtension = ".json"
 
-    -- Limites
+    
   , configMaxCharacterNameLength = 100
   , configMaxEventsToShow = 5
 
-    -- Valores padrão
+    
   , configDefaultAttributeValue = 2
   , configDefaultResourceSpirit = 5
   , configDefaultResourceHealth = 5
@@ -254,23 +254,23 @@ defaultConfig = Config
   , configDefaultResourceExperience = 0
   }
 
--- | Constantes do jogo
+
 data GameConstants = GameConstants
-  { -- Prefixos de log
+  { 
     logPrefixCharacterCreated :: T.Text
   , logPrefixSessionResumed :: T.Text
   , logPrefixDiceRolled :: T.Text
   , logPrefixAttributeUpdated :: T.Text
   , logPrefixResourceUpdated :: T.Text
 
-    -- Formato
+    
   , formatTimestamp :: String
-  , formatLogEntry :: T.Text -> T.Text -> T.Text  -- timestamp -> message -> formatted
+  , formatLogEntry :: T.Text -> T.Text -> T.Text  
   }
 
--- | Mensagens de moves
+
 data MoveMessages = MoveMessages
-  { -- Progress Moves
+  { 
     msgVowSworn :: T.Text
   , msgProgressMarked :: T.Text
   , msgTrackRemoved :: T.Text
@@ -282,14 +282,14 @@ data MoveMessages = MoveMessages
   , msgTracksHeader :: String
   , msgExecutingPayThePrice :: String
 
-    -- Oracle
+    
   , msgOracleResult :: T.Text
   , msgNoOraclesLoaded :: T.Text
   , msgOracleNotFound :: T.Text
   , msgOracleUsage :: String
   , msgOraclesHeader :: String
 
-    -- Formatters
+    
   , formatOracleRoll :: T.Text -> Int -> T.Text -> String
   , formatOracleIndex :: T.Text -> Int -> T.Text -> String
   , formatVowCreated :: T.Text -> String -> Int -> String
@@ -299,13 +299,13 @@ data MoveMessages = MoveMessages
   , msgUndertakeJourney :: String
   }
 
--- | Character display messages
+
 data CharacterDisplay = CharacterDisplay
   { formatCharacterSheet :: T.Text -> [(String, Int)] -> [(String, Int)] -> [T.Text] -> Int -> String
   , formatActionRoll :: Int -> Int -> Int -> String -> String
   }
 
--- | Mensagens padrão de moves
+
 moveMessages :: MoveMessages
 moveMessages = MoveMessages
   { msgVowSworn = "[+] Voto criado: "
@@ -321,7 +321,7 @@ moveMessages = MoveMessages
   , msgProgressUsage = "Use :tracks para ver tracks ativos"
   , msgNoTracksActive = "\nNenhum progress track ativo."
   , msgTracksHeader = "\n=== Progress Tracks Ativos ==="
-  , msgExecutingPayThePrice = "\n>>> Executando Pay the Price..."
+  , msgExecutingPayThePrice = "\n>>> Executando Pagar o Preço..."
 
   , msgOracleResult = "[*] Oráculo: "
   , msgNoOraclesLoaded = "Nenhum oráculo carregado."
@@ -332,7 +332,7 @@ moveMessages = MoveMessages
                      \:oracle \"Nome\" 42 - Consulta valor específico"
   , msgOraclesHeader = "\n=== Oráculos Disponíveis ==="
 
-  -- Formatters
+  
   , formatOracleRoll = \name roll text -> unlines
       [ ""
       , "[*] Oráculo: " ++ T.unpack name
@@ -405,7 +405,7 @@ characterDisplay = CharacterDisplay
         ]
   }
 
--- | Help messages
+
 data HelpMessages = HelpMessages
   { msgMoveUsage :: String
   , msgRanksAvailable :: String
@@ -415,19 +415,19 @@ data HelpMessages = HelpMessages
 helpMessages :: HelpMessages
 helpMessages = HelpMessages
   { msgMoveUsage = "Uso: :move <nome> [stat]\n\
-                   \Exemplo: :move Face Danger edge"
+                   \Exemplo: :move EnfrentarPerigo edge"
   , msgRanksAvailable = "Ranks válidos: troublesome, dangerous, formidable, extreme, epic"
   , msgMovesAvailable = unlines
       [ "Moves disponíveis:"
-      , "  Adventure: Face Danger, Gather Information, Secure Advantage, Heal, Resupply, Make Camp"
-      , "  Combat: Enter the Fray, Strike, Clash, Turn the Tide, End the Fight"
-      , "  Quest: Swear Vow, Fulfill Vow, Reach Milestone, Forsake Vow"
-      , "  Suffer: Endure Harm, Face Death, Endure Stress, Face Desolation"
-      , "  Fate: Pay the Price, Ask the Oracle"
+      , "  Aventura: EnfrentarPerigo, ColetarInformacao, SegurarVantagem, Curar, Reabastecer, FazerCampo"
+      , "  Combate: EntrarNoFronte, Atacar, Confrontar, VirarMesa, TerminarBatalha"
+      , "  Missão: JurarVoto, CumprirVoto, AlcancarMarco, AbanarVoto"
+      , "  Sofrimento: EnfrentarDano, EnfrentarMorte, EnfrentarEstresse, EnfrentarDesolacao"
+      , "  Destino: PagarOPreco, Oraculo"
       ]
   }
 
--- | Error messages
+
 data ErrorMessages = ErrorMessages
   { errChallengeRequiresChaining :: String
   , errMoveNameRequired :: String
@@ -454,24 +454,24 @@ errorMessages = ErrorMessages
   , errOracleError = "Erro: "
   }
 
--- | Progress roll interpretation messages
+
 data ProgressInterpretation = ProgressInterpretation
-  { -- Fulfill Your Vow
+  { 
     vowStrongHit :: String
   , vowWeakHit :: String
   , vowMiss :: String
 
-    -- End the Fight
+    
   , combatStrongHit :: String
   , combatWeakHit :: String
   , combatMiss :: String
 
-    -- Reach Your Destination
+    
   , journeyStrongHit :: String
   , journeyWeakHit :: String
   , journeyMiss :: String
 
-    -- General
+    
   , rollError :: String
   }
 
@@ -511,7 +511,7 @@ progressInterpretation = ProgressInterpretation
   , combatMiss = unlines
       [ "[X] MISS"
       , "Você falha em encerrar o combate."
-      , "Pay the Price - situação piorou!"
+      , "Pagar o Preço - situação piorou!"
       ]
 
   , journeyStrongHit = unlines
@@ -526,13 +526,13 @@ progressInterpretation = ProgressInterpretation
   , journeyMiss = unlines
       [ "[X] MISS"
       , "Você se perde, sofre um revés, ou a situação piora."
-      , "Pay the Price"
+      , "Pagar o Preço"
       ]
 
   , rollError = "Erro na rolagem"
   }
 
--- | Challenge interpretation messages
+
 data ChallengeInterpretation = ChallengeInterpretation
   { challengeHeader :: String
   , challengeStrongHit :: String
@@ -552,11 +552,11 @@ challengeInterpretation = ChallengeInterpretation
   , challengeExpects3Dice = "Erro: :challenge espera exatamente 3 dados (1d6,2d10)"
   }
 
--- | Idioma atual (configurável)
-currentLanguage :: Language
-currentLanguage = PT  -- Mude para EN para inglês
 
--- | Obtém mensagens baseado no idioma
+currentLanguage :: Language
+currentLanguage = PT  
+
+
 getMessages :: Language -> Messages
 getMessages PT = messages
 getMessages EN = messagesEN
@@ -581,33 +581,33 @@ getChallengeInterpretation :: Language -> ChallengeInterpretation
 getChallengeInterpretation PT = challengeInterpretation
 getChallengeInterpretation EN = challengeInterpretationEN
 
--- | Constantes padrão do jogo
+
 gameConstants :: GameConstants
 gameConstants = GameConstants
-  { -- Prefixos
+  { 
     logPrefixCharacterCreated = "Personagem criado: "
   , logPrefixSessionResumed = "Sessão retomada com "
   , logPrefixDiceRolled = "Dados rolados: "
   , logPrefixAttributeUpdated = "Atributo atualizado: "
   , logPrefixResourceUpdated = "Recurso atualizado: "
   
-    -- Formato
+    
   , formatTimestamp = "%Y-%m-%d %H:%M:%S"
   , formatLogEntry = \timestamp msg -> T.concat ["[", timestamp, "] ", msg]
   }
 
--- Versões EN dos outros tipos serão adicionadas conforme necessário
+
 moveMessagesEN :: MoveMessages
-moveMessagesEN = moveMessages  -- TODO: Traduzir
+moveMessagesEN = moveMessages  
 
 helpMessagesEN :: HelpMessages
-helpMessagesEN = helpMessages  -- TODO: Traduzir
+helpMessagesEN = helpMessages  
 
 errorMessagesEN :: ErrorMessages
-errorMessagesEN = errorMessages  -- TODO: Traduzir
+errorMessagesEN = errorMessages  
 
 progressInterpretationEN :: ProgressInterpretation
-progressInterpretationEN = progressInterpretation  -- TODO: Traduzir
+progressInterpretationEN = progressInterpretation  
 
 challengeInterpretationEN :: ChallengeInterpretation
-challengeInterpretationEN = challengeInterpretation  -- TODO: Traduzir
+challengeInterpretationEN = challengeInterpretation  

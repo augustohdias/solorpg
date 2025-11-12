@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RankNTypes #-}
 
@@ -11,7 +12,7 @@ import Brick.Widgets.Center (centerLayer, hCenter, vCenter)
 import qualified Brick.Widgets.Edit as Ed
 import Control.Concurrent (forkIO, threadDelay)
 import Control.Concurrent.STM
-import Control.Monad (forever, void)
+import Control.Monad (forever, void, when)
 import Control.Monad.IO.Class (liftIO)
 import qualified Data.Aeson as Aeson
 import Data.Char (digitToInt, isDigit)
@@ -25,6 +26,7 @@ import Data.Text.Zipper (clearZipper)
 import qualified Data.Vector as Vec
 import qualified Graphics.Vty as Vty
 import Lens.Micro (Lens')
+import qualified System.AssetLoader as AssetLoader
 import qualified System.ConsequenceContract as Consequence
 import System.Console.ANSI
 import qualified System.GameContext as GameContext
@@ -36,10 +38,8 @@ import System.Tui.Comm
     MessageType (..),
   )
 
--- Widget names
-data Name = InputField | LogViewport | SystemViewport | ChoicePopup deriving (Eq, Ord, Show)
+data Name = InputField | LogViewport | SystemViewport | CardsViewport | ChoicePopup | AssetExplorePopup | AssetViewPopup deriving (Eq, Ord, Show)
 
--- | Holds decoded information for an individual choice option.
 data ChoiceOptionState = ChoiceOptionState
   { optionPayload :: ChoiceOptionPayload,
     optionConsequences :: [Consequence.Consequence],
@@ -47,7 +47,6 @@ data ChoiceOptionState = ChoiceOptionState
     optionError :: Maybe T.Text
   }
 
--- | Represents the popup currently shown to the player.
 data ChoicePromptState = ChoicePromptState
   { choiceStatePayload :: ChoicePromptPayload,
     choiceStateOptions :: Vec.Vector ChoiceOptionState,
@@ -55,32 +54,43 @@ data ChoicePromptState = ChoicePromptState
     choiceStateError :: Maybe T.Text
   }
 
--- | Estado do prompt de aprovação de conexão
 data ConnectionPromptState = ConnectionPromptState
-  { connPromptPlayerName :: T.Text
-  , connPromptCharacterName :: T.Text
-  , connPromptSelected :: Int  -- 0 = Sim, 1 = Não
+  { connPromptPlayerName :: T.Text,
+    connPromptCharacterName :: T.Text,
+    connPromptSelected :: Int
   }
 
--- TUI State
+data AssetExploreState = AssetExploreState
+  { exploreAssets :: Vec.Vector GameContext.Asset,
+    exploreSelected :: Int
+  }
+
+data AssetViewState = AssetViewState
+  { viewAsset :: GameContext.Asset,
+    viewSkillSelected :: Int,
+    viewPlayerAsset :: Maybe GameContext.PlayerAsset
+  }
+
 data TuiState = TuiState
   { editor :: Ed.Editor T.Text Name,
-    logs :: Vec.Vector T.Text, -- Narrative and game logs
-    systemMessages :: Vec.Vector T.Text, -- System notifications
+    logs :: Vec.Vector T.Text,
+    systemMessages :: Vec.Vector T.Text,
     character :: Maybe GameContext.MainCharacter,
-    inputChan :: TChan T.Text, -- Channel to send commands to the game loop
-    viewportFocus :: F.FocusRing Name, -- Focus ring for viewport scrolling
-    activeChoice :: Maybe ChoicePromptState, -- Popup prompting the user
-    activeConnectionPrompt :: Maybe ConnectionPromptState, -- Prompt de aprovação de conexão
-    multiplayerStatus :: Maybe (Bool, T.Text, T.Text), -- (isHost, ip, port) ou (isClient, host, port)
-    connectedPlayers :: [T.Text] -- Lista de jogadores conectados
+    inputChan :: TChan T.Text,
+    viewportFocus :: F.FocusRing Name,
+    activeChoice :: Maybe ChoicePromptState,
+    activeConnectionPrompt :: Maybe ConnectionPromptState,
+    activeAssetExplore :: Maybe AssetExploreState,
+    activeAssetView :: Maybe AssetViewState,
+    cardsSelection :: Int,
+    multiplayerStatus :: Maybe (Bool, T.Text, T.Text),
+    connectedPlayers :: [T.Text]
   }
 
 choiceSelectedAttr, choiceDisabledAttr :: AttrName
 choiceSelectedAttr = attrName "choiceSelected"
 choiceDisabledAttr = attrName "choiceDisabled"
 
--- Brick App definition
 app :: App TuiState GameOutput Name
 app =
   App
@@ -97,7 +107,6 @@ app =
             ]
     }
 
--- Main entry point
 runTui :: TChan T.Text -> TChan GameOutput -> IO ()
 runTui inputChan' outputChan = do
   let initialState =
@@ -107,37 +116,30 @@ runTui inputChan' outputChan = do
             systemMessages = Vec.empty,
             character = Nothing,
             inputChan = inputChan',
-            viewportFocus = F.focusRing [LogViewport, SystemViewport], -- Start with LogViewport focused
+            viewportFocus = F.focusRing [LogViewport, SystemViewport, CardsViewport],
             activeChoice = Nothing,
             activeConnectionPrompt = Nothing,
+            activeAssetExplore = Nothing,
+            activeAssetView = Nothing,
+            cardsSelection = 0,
             multiplayerStatus = Nothing,
             connectedPlayers = []
           }
 
   eventChan <- newBChan 10
 
-  -- Thread to forward game output to the TUI event loop
   void . forkIO . forever $ do
     output <- atomically $ readTChan outputChan
-    -- Debug output (comment out in production)
-    -- case output of
-    --   LogEntry msg -> putStrLn $ "DEBUG TUI: Log - " ++ show msg
-    --   CharacterUpdate _ -> putStrLn "DEBUG TUI: Character update"
-    --   GameEnd -> putStrLn "DEBUG TUI: Game end"
+
     writeBChan eventChan output
 
-  -- Thread to periodically request character sheet updates
-  -- This ensures the UI stays in sync even if events are missed
-  -- Runs continuously but silently (no logs generated)
   void . forkIO . forever $ do
-    threadDelay 2000000 -- 2 seconds
-    -- Send update request (won't spam logs since showCharacter doesn't log)
+    threadDelay 2000000
+
     atomically $ writeTChan inputChan' ":char"
 
-  -- Run the TUI with custom event channel
   _ <- customMainWithDefaultVty (Just eventChan) app initialState
 
-  -- Clear screen and restore cursor position after TUI exits (vim-like behavior)
   clearScreen
   setCursorPosition 0 0
 
@@ -147,27 +149,27 @@ systemSheetWidth = 40
 charSheetWidth :: Int
 charSheetWidth = 25
 
--- Main drawing function
 drawTui :: TuiState -> [Widget Name]
 drawTui ts =
-  case (activeChoice ts, activeConnectionPrompt ts) of
-    (Just choiceState, _) -> [renderChoicePopup choiceState, baseUi]
-    (_, Just connPrompt) -> [renderConnectionPrompt connPrompt, baseUi]
+  case (activeChoice ts, activeConnectionPrompt ts, activeAssetExplore ts, activeAssetView ts) of
+    (Just choiceState, _, _, _) -> [renderChoicePopup choiceState, baseUi]
+    (_, Just connPrompt, _, _) -> [renderConnectionPrompt connPrompt, baseUi]
+    (_, _, Just exploreState, _) -> [renderAssetExplorePopup exploreState, baseUi]
+    (_, _, _, Just viewState) -> [renderAssetViewPopup viewState, baseUi]
     _ -> [baseUi]
   where
     baseUi = vBox [header, mainContent, inputBox]
     header = drawHeader (character ts) (viewportFocus ts) (multiplayerStatus ts) (connectedPlayers ts)
     mainContent = hBox [leftPanel, logPanel, systemPanel]
     leftPanel = vBox [charSheet, cardsSheet]
-    cardsSheet = hLimit charSheetWidth $ borderWithLabel (str " Cartas ") $ padAll 1 $ drawCards (character ts)
-    charSheet = hLimit charSheetWidth $ borderWithLabel (str " Personagem ") $ padAll 1 $ drawCharacter (character ts)
-    -- Log panel with word wrapping for long paragraphs
-    -- Add spacing between log entries for better readability
+    cardsSheet = vLimit charSheetWidth $ hLimit charSheetWidth $ borderWithLabel (str " Cartas ") $ padAll 1 $ drawCards (character ts) (viewportFocus ts) (cardsSelection ts)
+    charSheet = vLimit charSheetWidth $ hLimit charSheetWidth $ borderWithLabel (str " Personagem ") $ padAll 1 $ drawCharacter (character ts)
+
     logPanel =
       withVScrollBars OnRight $
         viewport LogViewport Vertical $
           vBox (intersperse (str " ") (map txtWrap (Vec.toList $ logs ts)))
-    -- System panel on the right side, similar to Character block
+
     systemPanel =
       hLimit systemSheetWidth $
         borderWithLabel (str " Sistema ") $
@@ -214,12 +216,12 @@ renderChoicePopup choiceState =
     errorWidgets =
       maybe [] (\err -> [str " ", withAttr choiceDisabledAttr (txtWrap err)]) (choiceStateError choiceState)
 
--- Draw header with scroll focus instruction and multiplayer status
 drawHeader :: Maybe GameContext.MainCharacter -> F.FocusRing Name -> Maybe (Bool, T.Text, T.Text) -> [T.Text] -> Widget Name
 drawHeader _ focusRing mpStatus players =
   let focusIndicator = case F.focusGetCurrent focusRing of
         Just LogViewport -> "Log"
         Just SystemViewport -> "Sistema"
+        Just CardsViewport -> "Cartas"
         _ -> "Nenhum"
       instruction = "Aperte <Tab> para mudar o foco do scroll | Foco atual: " ++ focusIndicator
       mpInfo = case mpStatus of
@@ -229,7 +231,6 @@ drawHeader _ focusRing mpStatus players =
       playersInfo = if null players then "" else " | Jogadores: " ++ T.unpack (T.intercalate ", " players)
    in hCenter $ str (instruction ++ mpInfo ++ playersInfo)
 
--- Render connection approval prompt
 renderConnectionPrompt :: ConnectionPromptState -> Widget Name
 renderConnectionPrompt prompt =
   centerLayer $
@@ -250,7 +251,6 @@ renderConnectionPrompt prompt =
             str "Use ↑/↓ para navegar, Enter para confirmar, Esc para cancelar"
           ]
 
--- Draw system messages with word wrap and spacing
 drawSystemMessages :: Vec.Vector T.Text -> Widget Name
 drawSystemMessages msgs =
   let msgList = Vec.toList msgs
@@ -258,15 +258,26 @@ drawSystemMessages msgs =
         then str "Nenhuma mensagem por enquanto."
         else vBox (intersperse (str " ") (map txtWrap msgList))
 
--- Draw cards list
-drawCards :: Maybe GameContext.MainCharacter -> Widget Name
-drawCards Nothing = hCenter $ vCenter $ str "Você ainda não cartas disponíveis."
-drawCards _ = vBox $ map buildCardDisplay placeholder
+drawCards :: Maybe GameContext.MainCharacter -> F.FocusRing Name -> Int -> Widget Name
+drawCards Nothing _ _ = hCenter $ vCenter $ str "Nenhum personagem carregado."
+drawCards (Just char) focusRing selectedIdx =
+  if null playerAssets
+    then hCenter $ vCenter $ str "Nenhum asset adquirido."
+    else vBox $ zipWith (curry (buildAssetDisplay isFocused selectedIdx)) [0 ..] playerAssets
   where
-    placeholder = ["Carta 1", "Carta 2", "Carta 3"]
-    buildCardDisplay cardData = vBox [hCenter $ str $ T.unpack cardData]
+    playerAssets = GameContext.assets char
+    isFocused = F.focusGetCurrent focusRing == Just CardsViewport
 
--- Draw character sheet
+    buildAssetDisplay :: Bool -> Int -> (Int, GameContext.PlayerAsset) -> Widget Name
+    buildAssetDisplay focused selIdx (idx, playerAsset) =
+      let isSelected = focused && idx == selIdx
+          assetName = GameContext.playerAssetName playerAsset
+          widget =
+            if isSelected
+              then withAttr choiceSelectedAttr $ str $ "> " <> T.unpack assetName
+              else str $ "  " <> T.unpack assetName
+       in widget
+
 drawCharacter :: Maybe GameContext.MainCharacter -> Widget Name
 drawCharacter Nothing = hCenter $ vCenter $ str "Sem personagem\ncarregado.\n\nDigite :help para ver\nas opções."
 drawCharacter (Just charData) =
@@ -300,18 +311,18 @@ drawResources res =
       str $ "EXP:      " ++ show (GameContext.experience res)
     ]
 
--- Event handler
 handleEvent :: BrickEvent Name GameOutput -> EventM Name TuiState ()
 handleEvent event = case event of
   AppEvent (ChoicePrompt payload) ->
     handleChoicePromptEvent payload
   AppEvent (ConnectionRequestPrompt playerName charName) -> do
     st <- get
-    let prompt = ConnectionPromptState
-          { connPromptPlayerName = playerName
-          , connPromptCharacterName = charName
-          , connPromptSelected = 0  -- Começa selecionando "Sim"
-          }
+    let prompt =
+          ConnectionPromptState
+            { connPromptPlayerName = playerName,
+              connPromptCharacterName = charName,
+              connPromptSelected = 0
+            }
     put st {activeConnectionPrompt = Just prompt}
   AppEvent (HostInfo ip port) -> do
     st <- get
@@ -324,6 +335,23 @@ handleEvent event = case event of
   AppEvent (PlayerList players) -> do
     st <- get
     put st {connectedPlayers = players}
+  AppEvent (AssetExploreRequest assets) -> do
+    st <- get
+    let exploreState =
+          AssetExploreState
+            { exploreAssets = Vec.fromList assets,
+              exploreSelected = 0
+            }
+    put st {activeAssetExplore = Just exploreState}
+  AppEvent (AssetViewRequest asset) -> do
+    st <- get
+    let viewState =
+          AssetViewState
+            { viewAsset = asset,
+              viewSkillSelected = 0,
+              viewPlayerAsset = Nothing
+            }
+    put st {activeAssetView = Just viewState}
   AppEvent (LogEntry msg msgType) -> do
     st <- get
     case msgType of
@@ -341,7 +369,6 @@ handleEvent event = case event of
     invalidateCache
   AppEvent GameEnd -> halt
   VtyEvent ev -> handleVtyEvent ev
-  -- Ignore mouse events and others
   _ -> return ()
 
 handleChoicePromptEvent :: ChoicePromptPayload -> EventM Name TuiState ()
@@ -401,16 +428,20 @@ handleVtyEvent :: Vty.Event -> EventM Name TuiState ()
 handleVtyEvent ev = do
   st <- get
   case ev of
-    Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> halt
+    Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> return ()
     Vty.EvKey Vty.KEsc [] ->
-      case (activeChoice st, activeConnectionPrompt st) of
-        (Just _, _) -> cancelChoiceSelection
-        (_, Just _) -> cancelConnectionPrompt
-        _ -> halt
+      case (activeChoice st, activeConnectionPrompt st, activeAssetExplore st, activeAssetView st) of
+        (Just _, _, _, _) -> cancelChoiceSelection
+        (_, Just _, _, _) -> cancelConnectionPrompt
+        (_, _, Just _, _) -> cancelAssetExplore
+        (_, _, _, Just _) -> cancelAssetView
+        _ -> return ()
     _ ->
-      case (activeChoice st, activeConnectionPrompt st) of
-        (Just _, _) -> handleChoicePopupKey ev
-        (_, Just _) -> handleConnectionPromptKey ev
+      case (activeChoice st, activeConnectionPrompt st, activeAssetExplore st, activeAssetView st) of
+        (Just _, _, _, _) -> handleChoicePopupKey ev
+        (_, Just _, _, _) -> handleConnectionPromptKey ev
+        (_, _, Just _, _) -> handleAssetExploreKey ev
+        (_, _, _, Just _) -> handleAssetViewKey ev
         _ -> handleDefaultVtyEvent ev
 
 handleChoicePopupKey :: Vty.Event -> EventM Name TuiState ()
@@ -435,7 +466,6 @@ handleChoicePopupKey ev = do
               submitChoiceSelectionIndex (digitToInt ch - 1)
         _ -> return ()
 
--- Handle keyboard events for connection prompt
 handleConnectionPromptKey :: Vty.Event -> EventM Name TuiState ()
 handleConnectionPromptKey ev = do
   st <- get
@@ -450,12 +480,11 @@ handleConnectionPromptKey ev = do
         Vty.EvKey Vty.KDown [] ->
           moveConnectionSelectionBy 1
         Vty.EvKey (Vty.KChar 's') [] ->
-          submitConnectionResponse True  -- 's' para Sim
+          submitConnectionResponse True
         Vty.EvKey (Vty.KChar 'n') [] ->
-          submitConnectionResponse False  -- 'n' para Não
+          submitConnectionResponse False
         _ -> return ()
 
--- Move connection prompt selection
 moveConnectionSelectionBy :: Int -> EventM Name TuiState ()
 moveConnectionSelectionBy delta = do
   st <- get
@@ -466,41 +495,52 @@ moveConnectionSelectionBy delta = do
       let newSelection = max 0 (min 1 (current + delta))
       put st {activeConnectionPrompt = Just prompt {connPromptSelected = newSelection}}
 
--- Submit connection response (accept or reject)
 submitConnectionResponse :: Bool -> EventM Name TuiState ()
 submitConnectionResponse accept = do
   st <- get
   case activeConnectionPrompt st of
     Nothing -> return ()
-    Just prompt -> do
-      -- Envia comando para aceitar ou recusar conexão
-      -- Por enquanto, vamos usar um comando especial que será processado pelo servidor
-      -- TODO: Implementar comando específico para aprovação de conexão
+    Just _ -> do
       let command = if accept then ":accept" else ":reject"
       liftIO $ atomically $ writeTChan (inputChan st) command
       put st {activeConnectionPrompt = Nothing}
 
--- Cancel connection prompt
 cancelConnectionPrompt :: EventM Name TuiState ()
 cancelConnectionPrompt = do
   st <- get
   case activeConnectionPrompt st of
     Nothing -> return ()
     Just _ -> do
-      -- Envia comando para recusar (cancelar = recusar)
       liftIO $ atomically $ writeTChan (inputChan st) ":reject"
       put st {activeConnectionPrompt = Nothing}
 
 handleDefaultVtyEvent :: Vty.Event -> EventM Name TuiState ()
-handleDefaultVtyEvent ev = case ev of
-  Vty.EvKey Vty.KEnter [] -> submitCommand
-  Vty.EvKey (Vty.KChar '\t') [] -> switchFocusNext
-  Vty.EvKey Vty.KBackTab [] -> switchFocusPrev
-  Vty.EvKey Vty.KUp [] -> scrollFocusedViewport (-1)
-  Vty.EvKey Vty.KDown [] -> scrollFocusedViewport 1
-  Vty.EvKey Vty.KPageUp [] -> scrollFocusedViewport (-10)
-  Vty.EvKey Vty.KPageDown [] -> scrollFocusedViewport 10
-  _ -> zoom editorL $ Ed.handleEditorEvent (VtyEvent ev)
+handleDefaultVtyEvent ev = do
+  st <- get
+  case ev of
+    Vty.EvKey (Vty.KChar '\t') [] -> switchFocusNext
+    Vty.EvKey Vty.KBackTab [] -> switchFocusPrev
+    Vty.EvKey Vty.KUp [] ->
+      if F.focusGetCurrent (viewportFocus st) == Just CardsViewport
+        then moveCardsSelection (-1)
+        else scrollFocusedViewport (-1)
+    Vty.EvKey Vty.KDown [] ->
+      if F.focusGetCurrent (viewportFocus st) == Just CardsViewport
+        then moveCardsSelection 1
+        else scrollFocusedViewport 1
+    Vty.EvKey Vty.KPageUp [] ->
+      if F.focusGetCurrent (viewportFocus st) == Just CardsViewport
+        then moveCardsSelection (-5)
+        else scrollFocusedViewport (-10)
+    Vty.EvKey Vty.KPageDown [] ->
+      if F.focusGetCurrent (viewportFocus st) == Just CardsViewport
+        then moveCardsSelection 5
+        else scrollFocusedViewport 10
+    Vty.EvKey Vty.KEnter [] ->
+      if F.focusGetCurrent (viewportFocus st) == Just CardsViewport
+        then openSelectedPlayerAsset
+        else submitCommand
+    _ -> zoom editorL $ Ed.handleEditorEvent (VtyEvent ev)
 
 submitCommand :: EventM Name TuiState ()
 submitCommand = do
@@ -598,6 +638,143 @@ submitChoiceSelectionIndex idx = do
               sendChoiceCommand (inputChan st) payload
               put st {activeChoice = Nothing}
 
+cancelAssetExplore :: EventM Name TuiState ()
+cancelAssetExplore = do
+  st <- get
+  put st {activeAssetExplore = Nothing}
+
+cancelAssetView :: EventM Name TuiState ()
+cancelAssetView = do
+  st <- get
+  put st {activeAssetView = Nothing}
+
+handleAssetExploreKey :: Vty.Event -> EventM Name TuiState ()
+handleAssetExploreKey ev = do
+  st <- get
+  case activeAssetExplore st of
+    Nothing -> return ()
+    Just exploreState ->
+      case ev of
+        Vty.EvKey Vty.KEnter [] -> do
+          let assets = exploreAssets exploreState
+          let selectedIdx = exploreSelected exploreState
+          when (selectedIdx >= 0 && selectedIdx < Vec.length assets) $ do
+            let selectedAsset = assets Vec.! selectedIdx
+            let viewState =
+                  AssetViewState
+                    { viewAsset = selectedAsset,
+                      viewSkillSelected = 0,
+                      viewPlayerAsset = Nothing
+                    }
+            put st {activeAssetExplore = Nothing, activeAssetView = Just viewState}
+        Vty.EvKey Vty.KUp [] ->
+          moveAssetExploreSelection (-1)
+        Vty.EvKey Vty.KDown [] ->
+          moveAssetExploreSelection 1
+        Vty.EvKey Vty.KPageUp [] ->
+          moveAssetExploreSelection (-5)
+        Vty.EvKey Vty.KPageDown [] ->
+          moveAssetExploreSelection 5
+        _ -> return ()
+
+handleAssetViewKey :: Vty.Event -> EventM Name TuiState ()
+handleAssetViewKey ev = do
+  st <- get
+  case activeAssetView st of
+    Nothing -> return ()
+    Just _ ->
+      case ev of
+        Vty.EvKey Vty.KUp [] ->
+          moveAssetViewSkillSelection (-1)
+        Vty.EvKey Vty.KDown [] ->
+          moveAssetViewSkillSelection 1
+        Vty.EvKey Vty.KEnter [] ->
+          showSelectedSkillDescription
+        _ -> return ()
+
+moveAssetExploreSelection :: Int -> EventM Name TuiState ()
+moveAssetExploreSelection delta = do
+  st <- get
+  case activeAssetExplore st of
+    Nothing -> return ()
+    Just exploreState -> do
+      let assets = exploreAssets exploreState
+      let currentIdx = exploreSelected exploreState
+      let maxIdx = Vec.length assets - 1
+      let newIdx = max 0 (min maxIdx (currentIdx + delta))
+      let newState = exploreState {exploreSelected = newIdx}
+      put st {activeAssetExplore = Just newState}
+
+moveAssetViewSkillSelection :: Int -> EventM Name TuiState ()
+moveAssetViewSkillSelection delta = do
+  st <- get
+  case activeAssetView st of
+    Nothing -> return ()
+    Just viewState -> do
+      let asset = viewAsset viewState
+      let currentIdx = viewSkillSelected viewState
+      let maxIdx = length (GameContext.assetSkills asset) - 1
+      let newIdx = max 0 (min maxIdx (currentIdx + delta))
+      let newState = viewState {viewSkillSelected = newIdx}
+      put st {activeAssetView = Just newState}
+
+moveCardsSelection :: Int -> EventM Name TuiState ()
+moveCardsSelection delta = do
+  st <- get
+  case character st of
+    Nothing -> return ()
+    Just char -> do
+      let playerAssets = GameContext.assets char
+      let currentIdx = cardsSelection st
+      let maxIdx = length playerAssets - 1
+      let newIdx = max 0 (min maxIdx (currentIdx + delta))
+      put st {cardsSelection = newIdx}
+
+openSelectedPlayerAsset :: EventM Name TuiState ()
+openSelectedPlayerAsset = do
+  st <- get
+  case character st of
+    Nothing -> return ()
+    Just char -> do
+      let playerAssets = GameContext.assets char
+      let selectedIdx = cardsSelection st
+      when (selectedIdx >= 0 && selectedIdx < length playerAssets) $ do
+        let playerAsset = playerAssets !! selectedIdx
+
+        liftIO (findPlayerAssetByName (GameContext.playerAssetName playerAsset)) >>= \case
+          Nothing -> return ()
+          Just fullAsset -> do
+            let viewState =
+                  AssetViewState
+                    { viewAsset = fullAsset,
+                      viewSkillSelected = 0,
+                      viewPlayerAsset = Just playerAsset
+                    }
+            put st {activeAssetView = Just viewState}
+
+findPlayerAssetByName :: T.Text -> IO (Maybe GameContext.Asset)
+findPlayerAssetByName assetName = do
+  find (\asset -> GameContext.assetName asset == assetName) <$> getAvailableAssets
+  where
+    getAvailableAssets = AssetLoader.getAvailableAssets
+
+showSelectedSkillDescription :: EventM Name TuiState ()
+showSelectedSkillDescription = do
+  st <- get
+  case activeAssetView st of
+    Nothing -> return ()
+    Just viewState -> do
+      let asset = viewAsset viewState
+      let selectedIdx = viewSkillSelected viewState
+      let skills = GameContext.assetSkills asset
+      when (selectedIdx >= 0 && selectedIdx < length skills) $ do
+        let selectedSkill = skills !! selectedIdx
+        let skillName = GameContext.skillName selectedSkill
+        let assetName = GameContext.assetName asset
+
+        let command = ":showskill \"" <> assetName <> "\" \"" <> skillName <> "\""
+        liftIO $ atomically $ writeTChan (inputChan st) command
+
 cancelChoiceSelection :: EventM Name TuiState ()
 cancelChoiceSelection = do
   st <- get
@@ -634,6 +811,81 @@ setChoiceError err =
             Just existing -> existing <> "\n" <> err
      in st {choiceStateError = Just combinedError}
 
--- Lens for the editor field
 editorL :: Lens' TuiState (Ed.Editor T.Text Name)
 editorL f s = (\e -> s {editor = e}) <$> f (editor s)
+
+renderAssetExplorePopup :: AssetExploreState -> Widget Name
+renderAssetExplorePopup exploreState =
+  centerLayer $
+    borderWithLabel (str " Explorar Assets ") $
+      padAll 1 $
+        vBox $
+          [ str "Use ↑/↓ para navegar, ENTER para ver detalhes, ESC para fechar",
+            str " "
+          ]
+            ++ assetWidgets
+  where
+    assets = exploreAssets exploreState
+    selectedIdx = exploreSelected exploreState
+    assetWidgets = Vec.toList $ Vec.imap renderAssetItem assets
+
+    renderAssetItem :: Int -> GameContext.Asset -> Widget Name
+    renderAssetItem idx asset =
+      let isSelected = idx == selectedIdx
+          assetText = GameContext.assetName asset <> " (" <> assetTypeToText (GameContext.assetType asset) <> ")"
+          widget =
+            if isSelected
+              then withAttr choiceSelectedAttr $ padLeft (Pad 2) $ str $ "> " <> T.unpack assetText
+              else padLeft (Pad 4) $ str $ T.unpack assetText
+       in widget
+
+renderAssetViewPopup :: AssetViewState -> Widget Name
+renderAssetViewPopup viewState =
+  centerLayer $
+    hLimit 80 $
+      borderWithLabel (str $ " " <> T.unpack (GameContext.assetName asset) <> " ") $
+        padAll 1 $
+          vBox $
+            [ str $ "Tipo: " <> T.unpack (assetTypeToText (GameContext.assetType asset)),
+              str " "
+            ]
+              ++ skillWidgets
+              ++ [ str " ",
+                   str "* = habilidade habilitada, - = habilidade disponível",
+                   str "Use ↑/↓ para navegar, ENTER para ver descrição, ESC para fechar"
+                 ]
+  where
+    asset = viewAsset viewState
+    selectedSkillIdx = viewSkillSelected viewState
+    skills = GameContext.assetSkills asset
+    skillWidgets = zipWith (curry (renderSkillItem selectedSkillIdx)) [0 ..] skills
+
+    renderSkillItem :: Int -> (Int, GameContext.AssetSkill) -> Widget Name
+    renderSkillItem selectedIdx (idx, skill) =
+      let isSelected = idx == selectedIdx
+          skillNumber = GameContext.skillIndex skill
+          skillNameText = GameContext.skillName skill
+
+          skillPrefix = case viewPlayerAsset viewState of
+            Nothing -> "- "
+            Just playerAsset ->
+              if skillNumber `elem` GameContext.enabledSkills playerAsset
+                then "* "
+                else "- "
+          widget =
+            if isSelected
+              then
+                withAttr choiceSelectedAttr $
+                  vBox [str $ "> " <> skillPrefix <> T.unpack skillNameText]
+              else vBox [str $ "  " <> skillPrefix <> T.unpack skillNameText]
+       in vBox [widget, str " "]
+
+assetTypeToText :: GameContext.AssetType -> T.Text
+assetTypeToText GameContext.Companion = "Companheiro"
+assetTypeToText GameContext.Path = "Caminho"
+assetTypeToText GameContext.CombatTalent = "Talento de Combate"
+assetTypeToText GameContext.Ritual = "Ritual"
+assetTypeToText GameContext.Module = "Módulo"
+assetTypeToText GameContext.SupportVehicle = "Veículo de Apoio"
+assetTypeToText GameContext.CommandVehicle = "Veículo de Comando"
+assetTypeToText GameContext.Deed = "Feito"

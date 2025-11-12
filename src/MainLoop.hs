@@ -2,7 +2,7 @@
 
 module MainLoop 
   ( runGameLoop
-  -- Exported for testing
+  
   , parseCommand
   , parseActionType
   ) where
@@ -17,7 +17,7 @@ import System.Tui.Comm (GameOutput)
 
 runGameLoop :: TChan GameOutput -> TChan T.Text -> IO ()
 runGameLoop outputChan inputChan = do
-  -- Game loop
+  
   let loop = do
         input <- atomically $ readTChan inputChan
         let (action, params) = parseCommand input
@@ -25,7 +25,7 @@ runGameLoop outputChan inputChan = do
         continue <- Action.process outputChan action params
         if continue
           then loop
-          else exitSuccess -- Or send a GameEnd message
+          else exitSuccess 
   loop
 
 parseCommand :: T.Text -> (Action.ActionType, T.Text)
@@ -71,4 +71,9 @@ parseActionType cmd = case cmd of
   ":sharedvow" -> Action.SharedVow
   ":accept" -> Action.AcceptConnection
   ":reject" -> Action.RejectConnection
+  ":pickasset" -> Action.PickAssetCommand
+  ":addasset" -> Action.AddAssetCommand
+  ":exploreassets" -> Action.ExploreAssets
+  ":viewasset" -> Action.ViewAsset
+  ":showskill" -> Action.ShowSkillDescription
   _ -> Action.Unknown
