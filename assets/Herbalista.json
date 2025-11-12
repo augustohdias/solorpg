@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Herbalista",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Medicina Herbarum",
+            "description": "Quando tentar fazer o movimento Curar usando remédios de ervas e tiver ao menos +1 em suprimentos, escolha uma opção antes de rolar: adicionar +2 ou, com um sucesso, conceder +1 adicional em saúde."
+        },
+        {
+            "index": 2,
+            "skillName": "Auxilium Vitae",
+            "description": "Quando Curar um companheiro, aliado ou outro personagem e marcar um sucesso, receba +1 em espírito ou +1 em momentum."
+        },
+        {
+            "index": 3,
+            "skillName": "Cena Salutaris",
+            "description": "Quando fizer o movimento Montar Acampamento e optar por participar, pode usar seus suprimentos para criar uma refeição restauradora. Você e seus companheiros recebem +1 em saúde."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

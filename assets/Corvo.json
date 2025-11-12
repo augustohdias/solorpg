@@ -1,0 +1,24 @@
+{
+    "type": "COMPANION",
+    "name": "Corvo",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Callidus",
+            "description": "Quando você fizer o movimento Garantir uma Vantagem ou Enfrentar o Perigo role +sombra usando seu corvo para executar truques (como criar uma distração ou roubar um pequeno objeto), adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Diligens",
+            "description": "Quando seu corvo carregar mensagens para você, pode fazer o movimento Garantir uma Vantagem, Coletar Informações ou Convencer à distância."
+        },
+        {
+            "index": 3,
+            "skillName": "Intellegens",
+            "description": "Quando você fizer o movimento Enfrentar a Morte, adicione +2 e receba +1 em momentum com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

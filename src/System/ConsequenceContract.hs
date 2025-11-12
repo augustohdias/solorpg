@@ -73,7 +73,10 @@ data Consequence
   | Narrative T.Text
   | AddBonus GameContext.ActiveBonus
   | MarkBondProgress
+  | MarkJourneyProgress
   | ImproveAsset T.Text
+  | ChooseAssetImprovement T.Text
+  | ImproveSpecificAssetSkill T.Text Int
   | PickAsset T.Text
   | AddAssetToPlayer T.Text
   | DeductExperience Int

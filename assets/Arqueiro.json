@@ -1,0 +1,24 @@
+{
+    "type": "COMBAT_TALENT",
+    "name": "Arqueiro",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Sagittarius",
+            "description": "Quando você fizer o movimento Garantir uma Vantagem +centelha, você recebe um instante para mirar. Imagine onde você pretende acertar o seu tiro. Em seguida, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Duplicis Ictus",
+            "description": "Uma vez por luta, quando você fizer o movimento Atacar ou Confrontar, você pode receber tiros extras e sofrer -1 em suprimentos. Se fizer isso, role novamente qualquer dado. Com um sucesso, cause +2 de dano e receba +1 em momentum."
+        },
+        {
+            "index": 3,
+            "skillName": "Venatio",
+            "description": "Quando você fizer o movimento Reabastecer devido a uma caçada, adicione +1 e receba +1 momentum com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

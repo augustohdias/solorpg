@@ -1,0 +1,24 @@
+{
+    "type": "COMBAT_TALENT",
+    "name": "Divisor",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Bipennis",
+            "description": "Quando você fizer o movimento Atacar ou Confrontar próximo ao seu alvo, você pode sofrer -1 em momentum e causar +1 de dano com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Mors Honesta",
+            "description": "Quando tiver seu machado em mãos e fizer uma ameaça violenta usando Convencer ou Garantir uma Vantagem, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Runarum Memoriam",
+            "description": "Quando fizer uma homenagem a um inimigo caído talhando uma runa no cabo do seu machado, role +coração. Com sucesso decisivo, cause +1d6 de dano (apenas uma vez). Com sucesso parcial, sofra Suportar Estresse (2 estresses)."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

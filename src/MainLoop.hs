@@ -56,6 +56,9 @@ parseActionType cmd = case cmd of
   ":move" -> Action.Move
   ":vow" -> Action.SwearVow
   ":combat" -> Action.CreateCombatTrack
+  ":journey" -> Action.CreateJourneyTrack
+  ":endfight" -> Action.EndCombat
+  ":reachdestination" -> Action.ReachDestination
   ":progress" -> Action.MarkProgress
   ":fulfill" -> Action.RollProgress
   ":tracks" -> Action.ShowTracks

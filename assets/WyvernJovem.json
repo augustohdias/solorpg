@@ -1,0 +1,24 @@
+{
+    "type": "COMPANION",
+    "name": "Wyvern Jovem",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Insatiabilis",
+            "description": "Quando você fizer o movimento Empreender uma Jornada e marcar um sucesso, você pode sofrer -1 em suprimentos em troca de +1 em momentum."
+        },
+        {
+            "index": 2,
+            "skillName": "Indomitus",
+            "description": "Quando você fizer o movimento Companheiro Suportar Dano para o seu wyvern, adicione +2 e receba +1 momentum com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Silvestris",
+            "description": "Quando você fizer o movimento Atacar comandando seu wyvern para arremeter, role +coração. Seu wyvern causa 3 danos com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

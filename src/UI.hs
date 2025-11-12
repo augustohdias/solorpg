@@ -151,6 +151,12 @@ systemSheetWidth = 40
 charSheetWidth :: Int
 charSheetWidth = 25
 
+cardsSheetWidth :: Int
+cardsSheetWidth = 25
+
+cardsSheetHeight :: Int
+cardsSheetHeight = 15
+
 drawTui :: TuiState -> [Widget Name]
 drawTui ts =
   case (activeChoice ts, activeConnectionPrompt ts, activeAssetExplore ts, activeAssetView ts) of
@@ -169,7 +175,9 @@ drawTui ts =
           borderWidget = if isCardsFocused
             then withAttr borderSelectedAttr . borderWithLabel (str " Cartas ")
             else borderWithLabel (str " Cartas ")
-      in vLimit charSheetWidth $ hLimit charSheetWidth $ borderWidget $ padAll 1 $ drawCards (character ts) (viewportFocus ts) (cardsSelection ts)
+      in vLimit cardsSheetHeight $ hLimit cardsSheetWidth $ borderWidget $ padAll 1 $ 
+           withVScrollBars OnRight $ viewport CardsViewport Vertical $ 
+           drawCards (character ts) (viewportFocus ts) (cardsSelection ts)
     charSheet = vLimit charSheetWidth $ hLimit charSheetWidth $ borderWithLabel (str " Personagem ") $ padAll 1 $ drawCharacter (character ts)
 
     logPanel =
@@ -275,10 +283,15 @@ drawSystemMessages msgs =
         else vBox (intersperse (str " ") (map txtWrap msgList))
 
 drawCards :: Maybe GameContext.MainCharacter -> F.FocusRing Name -> Int -> Widget Name
-drawCards Nothing _ _ = hCenter $ vCenter $ str "Nenhum personagem carregado."
+drawCards Nothing _ _ = 
+  vBox $ 
+    [str "Nenhum personagem carregado."] ++ 
+    replicate (cardsSheetHeight - 3) (str "")  -- Preenche o espaço restante
 drawCards (Just char) focusRing selectedIdx =
   if null playerAssets
-    then hCenter $ vCenter $ str "Nenhum asset adquirido."
+    then vBox $ 
+           [str "Nenhum asset adquirido."] ++ 
+           replicate (cardsSheetHeight - 3) (str "")  -- Preenche o espaço restante
     else vBox $ zipWith (curry (buildAssetDisplay isFocused selectedIdx)) [0 ..] playerAssets
   where
     playerAssets = GameContext.assets char

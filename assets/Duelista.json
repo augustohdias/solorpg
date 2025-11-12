@@ -1,0 +1,24 @@
+{
+    "type": "COMBAT_TALENT",
+    "name": "Duelista",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Duelum",
+            "description": "Quando você fizer o movimento Confrontar ou Atacar com lâminas em ambas as mãos, você pode adicionar +2. Se fizer isso, cause +1 de dano com um sucesso decisivo e conte um sucesso parcial como falha."
+        },
+        {
+            "index": 2,
+            "skillName": "Virtus Ostentatio",
+            "description": "Uma vez por luta, quando você fizer o movimento Garantir uma Vantagem +gume ao exibir corajosamente sua proeza em combate, role novamente qualquer dado."
+        },
+        {
+            "index": 3,
+            "skillName": "Circulus",
+            "description": "Quando fizer o movimento Desenhar o Círculo, escolha: adicione +2, ou receba +2 em momentum com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

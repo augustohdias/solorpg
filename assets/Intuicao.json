@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Intuição",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Sensum Arcanae",
+            "description": "Quando fizer o movimento Enfrentar o Perigo ou Coletar Informações para identificar forças místicas, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Communio Mystica",
+            "description": "Quando fizer o movimento Convencer, Forjar um Vínculo ou Testar seu Vínculo com um ser místico, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Revelatio Interioris",
+            "description": "Quando Garantir uma Vantagem por estudar alguém ou algo em uma situação tensa, adicione +1 e receba +1 em momentum com um sucesso. Se romper o véu para buscar verdades mais profundas, pode rolar novamente qualquer dado. Um sucesso parcial conta como falha."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

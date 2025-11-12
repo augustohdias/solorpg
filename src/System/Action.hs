@@ -19,7 +19,7 @@ import qualified Data.Text.Encoding as TE
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Read as TR
 import Data.Time.Clock (getCurrentTime)
-import System.ConsequenceContract (Choice (..), Consequence (..))
+import System.ConsequenceContract (Choice (..), Consequence (..), MoveType (..))
 import qualified System.ConsequenceContract as Consequence
 import qualified System.Constants as C
 import qualified System.Dice as Dice
@@ -77,6 +77,12 @@ data ActionType
     SwearVow
   | 
     CreateCombatTrack
+  | 
+    CreateJourneyTrack
+  | 
+    EndCombat
+  | 
+    ReachDestination
   | 
     MarkProgress
   | 
@@ -139,6 +145,9 @@ process tuiOutputChannel actionType input = case actionType of
   Move -> moveAction tuiOutputChannel input
   SwearVow -> swearVow tuiOutputChannel input
   CreateCombatTrack -> createCombatTrack tuiOutputChannel input
+  CreateJourneyTrack -> createJourneyTrack tuiOutputChannel input
+  EndCombat -> endTheFight tuiOutputChannel input
+  ReachDestination -> reachDestination tuiOutputChannel input
   MarkProgress -> markProgress tuiOutputChannel input
   RollProgress -> rollProgress tuiOutputChannel input
   ShowTracks -> showTracks tuiOutputChannel input
@@ -607,6 +616,9 @@ processConsequence tuiOutputChannel ctx cons remaining = case cons of
   MarkBondProgress -> do
     markBondProgressTrack tuiOutputChannel ctx
     return False
+  MarkJourneyProgress -> do
+    markJourneyProgressTrack tuiOutputChannel ctx
+    return False
   Consequence.ImproveAsset assetName -> do
     
     let currentXP = GameContext.experience (GameContext.resources (GameContext.mainCharacter ctx))
@@ -623,6 +635,18 @@ processConsequence tuiOutputChannel ctx cons remaining = case cons of
             systemMessage tuiOutputChannel "Gastou 1 XP para melhorar o asset."
             return False
           else return False 
+  Consequence.ChooseAssetImprovement description -> do
+    
+    let currentXP = GameContext.experience (GameContext.resources (GameContext.mainCharacter ctx))
+    if currentXP < 2
+      then do
+        systemMessage tuiOutputChannel "Experiência insuficiente. Custa 2 XP para melhorar um asset."
+        return False
+      else do
+        successful <- presentAssetImprovementChoice tuiOutputChannel description remaining ctx
+        if successful
+          then return True  -- Pausa para aguardar escolha do usuário
+          else return False
   Consequence.PickAsset description -> do
     
     let currentXP = GameContext.experience (GameContext.resources (GameContext.mainCharacter ctx))
@@ -644,6 +668,15 @@ processConsequence tuiOutputChannel ctx cons remaining = case cons of
     _ <- process tuiOutputChannel AddResource ("experience:-" <> T.pack (show amount))
     systemMessage tuiOutputChannel $ "Gastou " <> T.pack (show amount) <> " XP."
     return False
+  Consequence.ImproveSpecificAssetSkill assetName skillIndex -> do
+    successful <- improveSpecificAssetSkill tuiOutputChannel ctx assetName skillIndex
+    if successful
+      then do
+        systemMessage tuiOutputChannel $ "Asset " <> assetName <> " melhorado com sucesso!"
+        return False
+      else do
+        systemMessage tuiOutputChannel $ "Erro ao melhorar o asset " <> assetName <> "."
+        return False
 
 
 presentPlayerChoice :: TChan GameOutput -> [Choice] -> [Consequence] -> IO ()
@@ -709,6 +742,34 @@ markBondProgressTrack tuiOutputChannel _ctx = do
       logMessage tuiOutputChannel $ "[+] Bond progress: " <> T.pack (show boxes) <> "/10 boxes (" <> T.pack (show ticks) <> "/40 ticks)"
 
 
+markJourneyProgressTrack :: TChan GameOutput -> GameContext.Context -> IO ()
+markJourneyProgressTrack tuiOutputChannel _ctx = do
+  maybeCurrentCtx <- GameContext.getCurrentContext
+  case maybeCurrentCtx of
+    Nothing -> return ()
+    Just currentCtx -> do
+      -- Procura o journey track ativo mais recente
+      let journeyTracks = filter (\t -> Progress.trackType t == Progress.Journey && not (Progress.trackCompleted t)) (GameContext.progressTracks currentCtx)
+      
+      case journeyTracks of
+        [] -> do
+          systemMessage tuiOutputChannel "Nenhuma jornada ativa encontrada. Use :journey para criar uma jornada."
+          return ()
+        (track:_) -> do
+          -- Marca progresso no journey track
+          updatedTrack <- Progress.markProgress track
+          
+          updatedCtx <- GameContext.updateProgressTrack currentCtx (Progress.trackName track) updatedTrack
+          _ <- GameContext.saveContext updatedCtx
+
+          let boxes = Progress.getProgressScore updatedTrack
+          let ticks = Progress.trackTicks updatedTrack
+          logMessage tuiOutputChannel $ "[+] Journey progress: " <> Progress.trackName track <> " (" <> T.pack (show boxes) <> "/10 boxes, " <> T.pack (show ticks) <> "/40 ticks)"
+
+          -- Sincronizar em multiplayer se necessário
+          when (GameContext.isMultiplayer updatedCtx) $ syncProgressTrack tuiOutputChannel updatedCtx (Progress.trackName track) updatedTrack
+
+
 improvePlayerAsset :: TChan GameOutput -> GameContext.Context -> T.Text -> IO Bool
 improvePlayerAsset tuiOutputChannel ctx assetName = do
   let playerAssets = GameContext.assets (GameContext.mainCharacter ctx)
@@ -769,6 +830,105 @@ presentPickAssetChoice tuiOutputChannel _ remaining = do
             , Consequence.DeductExperience 2  
             ]
         }
+
+
+presentAssetImprovementChoice :: TChan GameOutput -> T.Text -> [Consequence] -> GameContext.Context -> IO Bool
+presentAssetImprovementChoice tuiOutputChannel _description remaining ctx = do
+  improvementOptions <- getAssetImprovementOptions ctx
+  if null improvementOptions
+    then do
+      systemMessage tuiOutputChannel "Nenhum asset pode ser melhorado no momento."
+      return False
+    else do
+      let improvementChoices = map createImprovementChoice improvementOptions
+      presentPlayerChoice tuiOutputChannel improvementChoices remaining
+      return True
+  where
+    createImprovementChoice :: (T.Text, T.Text, Int) -> Consequence.Choice
+    createImprovementChoice (assetName, skillName, skillIndex) =
+      Consequence.Choice
+        { Consequence.choiceDescription = assetName <> ", " <> skillName
+        , Consequence.choiceConsequences =
+            [ Consequence.Narrative $ "Melhorei " <> assetName <> ", " <> skillName
+            , Consequence.ImproveSpecificAssetSkill assetName skillIndex
+            , Consequence.DeductExperience 2
+            ]
+        }
+
+
+getAssetImprovementOptions :: GameContext.Context -> IO [(T.Text, T.Text, Int)]
+getAssetImprovementOptions ctx = do
+  let playerAssets = GameContext.assets (GameContext.mainCharacter ctx)
+  improvementOptions <- mapM getAssetOptions playerAssets
+  return $ concat improvementOptions
+  where
+    getAssetOptions :: GameContext.PlayerAsset -> IO [(T.Text, T.Text, Int)]
+    getAssetOptions playerAsset = do
+      let assetName = GameContext.playerAssetName playerAsset
+      maybeBaseAsset <- AssetLoader.findAssetByName assetName
+      case maybeBaseAsset of
+        Nothing -> return []
+        Just baseAsset -> do
+          let currentSkills = GameContext.enabledSkills playerAsset
+          let allSkills = GameContext.assetSkills baseAsset
+          let availableSkills = filter (\(idx, _) -> idx `notElem` currentSkills) (zip [1..] allSkills)
+          return $ map (\(idx, skill) -> (assetName, GameContext.skillName skill, idx)) availableSkills
+
+
+improveSpecificAssetSkill :: TChan GameOutput -> GameContext.Context -> T.Text -> Int -> IO Bool
+improveSpecificAssetSkill tuiOutputChannel ctx assetName skillIndex = do
+  let playerAssets = GameContext.assets (GameContext.mainCharacter ctx)
+  case find (\pa -> GameContext.playerAssetName pa == assetName) playerAssets of
+    Nothing -> do
+      systemMessage tuiOutputChannel $ "Você não possui o asset: " <> assetName
+      return False
+    Just playerAsset -> do
+      -- Verifica se o asset base existe
+      maybeBaseAsset <- AssetLoader.findAssetByName assetName
+      case maybeBaseAsset of
+        Nothing -> do
+          systemMessage tuiOutputChannel $ "Definição do asset não encontrada: " <> assetName
+          return False
+        Just baseAsset -> do
+          let currentSkills = GameContext.enabledSkills playerAsset
+          let allSkills = GameContext.assetSkills baseAsset
+          let maxSkills = length allSkills
+          
+          -- Validações
+          if skillIndex < 1 || skillIndex > maxSkills
+            then do
+              systemMessage tuiOutputChannel $ "Índice de habilidade inválido: " <> T.pack (show skillIndex)
+              return False
+            else if skillIndex `elem` currentSkills
+              then do
+                systemMessage tuiOutputChannel $ "Esta habilidade já está habilitada no asset " <> assetName
+                return False
+              else do
+                -- Melhora o asset adicionando a nova skill
+                let updatedSkills = skillIndex : currentSkills
+                let updatedAsset = playerAsset { GameContext.enabledSkills = updatedSkills }
+                let otherAssets = filter (\pa -> GameContext.playerAssetName pa /= assetName) playerAssets
+                let char = GameContext.mainCharacter ctx
+                let newChar = char { GameContext.assets = updatedAsset : otherAssets }
+                let updatedCtx = ctx { GameContext.mainCharacter = newChar }
+                
+                -- Salva no contexto e no savefile
+                _ <- GameContext.saveContext updatedCtx
+                
+                -- Atualiza o cache de contexto em memória
+                cache <- GameContext.getContextCache
+                modifyMVar_ cache $ \_ -> return (Just updatedCtx)
+                
+                -- Notifica a UI sobre a atualização do personagem
+                atomically $ writeTChan tuiOutputChannel (CharacterUpdate newChar)
+                
+                -- Obtém o nome da skill melhorada
+                let skillName = case drop (skillIndex - 1) allSkills of
+                      [] -> "Habilidade " <> T.pack (show skillIndex)
+                      (skill:_) -> GameContext.skillName skill
+                
+                systemMessage tuiOutputChannel $ "Asset " <> assetName <> " melhorado: " <> skillName <> " habilitada"
+                return True
 
 
 pickAsset :: TChan GameOutput -> T.Text -> IO Bool
@@ -1070,41 +1230,219 @@ createCombatTrack tuiOutputChannel input = withContext $ \ctx -> maybe handlePar
       return True
 
 
-markProgress :: TChan GameOutput -> T.Text -> IO Bool
-markProgress tuiOutputChannel input = withContext $ \ctx -> do
+createJourneyTrack :: TChan GameOutput -> T.Text -> IO Bool
+createJourneyTrack tuiOutputChannel input = withContext $ \ctx -> maybe handleParseError (processJourney ctx) (Parser.parseQuotedString input)
+  where
+    handleParseError = systemMessage tuiOutputChannel (T.pack (C.msgJourneyTrackUsage C.moveMessages)) >> return True
+    processJourney ctx (destination, rest) = maybe (handleInvalidRank rest) (createJourney ctx destination) (Parser.parseRank (T.strip rest))
+    handleInvalidRank rest = do
+      systemMessage tuiOutputChannel $ T.pack (C.errInvalidRank C.errorMessages) <> T.strip rest
+      systemMessage tuiOutputChannel $ T.pack (C.msgJourneyTrackUsage C.moveMessages)
+      return True
+    createJourney ctx destination rank = do
+      let track = Progress.newProgressTrack destination Progress.Journey rank
+      let ticks = Progress.getTicksForRank rank
+      updatedCtx <- GameContext.addProgressTrack ctx track
+      _ <- GameContext.saveContext updatedCtx
+      let formattedMsg = T.pack $ C.formatJourneyTrackCreated C.moveMessages destination (T.unpack $ Parser.rankToText rank) ticks
+      _ <- process tuiOutputChannel AddStoryLog formattedMsg
+
+      -- Sync para multiplayer se necessário
+      when (GameContext.isMultiplayer updatedCtx) $ syncProgressTrack tuiOutputChannel updatedCtx destination track
+
+      return True
+
+
+endTheFight :: TChan GameOutput -> T.Text -> IO Bool
+endTheFight tuiOutputChannel input = withContext $ \ctx -> do
   let trackName = T.strip input
   case nonEmpty trackName of
-    Nothing -> systemMessage tuiOutputChannel (T.pack (C.msgProgressUsage C.moveMessages)) >> return True
-    Just name -> handleTrackName ctx name
+    Nothing -> do
+      systemMessage tuiOutputChannel "Uso: :endfight \"<nome da combat track>\""
+      systemMessage tuiOutputChannel "Exemplo: :endfight \"Bandidos\""
+      return True
+    Just name -> handleCombatTrack ctx name
   where
-    handleTrackName ctx name = case GameContext.getProgressTrack ctx name of
+    handleCombatTrack ctx name = case GameContext.getProgressTrack ctx name of
       Nothing -> systemMessage tuiOutputChannel (C.msgTrackNotFound C.moveMessages <> name) >> return True
-      Just track -> processTrack ctx name track
+      Just track -> 
+        if Progress.trackType track /= Progress.Combat
+          then do
+            systemMessage tuiOutputChannel $ "\"" <> name <> "\" não é uma combat track."
+            return True
+          else processCombatTrack ctx name track
 
-    processTrack ctx name track
+    processCombatTrack ctx name track
+      | Progress.trackCompleted track = systemMessage tuiOutputChannel "Combat track já está completo!" >> return True
+      | otherwise = do
+          let progressScore = Progress.getProgressScore track  -- Número de boxes preenchidas
+          
+          -- Rolar dados de desafio para o progress roll
+          challengeRolls <- Dice.roll (T.pack "2d10")
+          case challengeRolls of
+            [(_, ch1), (_, ch2)] -> do
+              -- Fazer progress roll usando o movimento EndTheFight  
+              let char = GameContext.mainCharacter ctx
+              let attrs = GameContext.attributes char
+              let resources = GameContext.resources char
+              consequences <- Move.executeMoveWithRoll EndTheFight Nothing progressScore (ch1, ch2) attrs resources
+              
+              -- Processar consequências
+              processConsequences tuiOutputChannel consequences ctx
+              
+              -- Se foi bem-sucedido, marcar a track como completa e dar experiência
+              let wasSuccess = any isSuccessConsequence consequences
+              when wasSuccess $ do
+                completedTrack <- Progress.completeTrack track
+                updatedCtx <- GameContext.updateProgressTrack ctx name completedTrack
+                _ <- GameContext.saveContext updatedCtx
+                
+                -- Dar experiência baseada no rank
+                let expGained = Progress.getRankExperienceValue (Progress.trackRank track)
+                _ <- process tuiOutputChannel AddResource ("experience:+" <> T.pack (show expGained))
+                systemMessage tuiOutputChannel $ "Combat concluído! Ganhou " <> T.pack (show expGained) <> " XP."
+              
+              return True
+            _ -> do
+              systemMessage tuiOutputChannel "Erro ao rolar dados de desafio."
+              return True
+    
+    -- Verifica se houve sucesso (Strong Hit ou Weak Hit)
+    isSuccessConsequence :: Consequence -> Bool
+    isSuccessConsequence (Narrative text) = 
+      T.isInfixOf "vence decisivamente" text || T.isInfixOf "vence, mas" text
+    isSuccessConsequence _ = False
+    
+    nonEmpty s = if T.null s then Nothing else Just s
+
+
+reachDestination :: TChan GameOutput -> T.Text -> IO Bool
+reachDestination tuiOutputChannel input = withContext $ \ctx -> do
+  let trackName = T.strip input
+  case nonEmpty trackName of
+    Nothing -> do
+      systemMessage tuiOutputChannel "Uso: :reachdestination \"<nome da journey track>\""
+      systemMessage tuiOutputChannel "Exemplo: :reachdestination \"Vila Próxima\""
+      return True
+    Just name -> handleJourneyTrack ctx name
+  where
+    handleJourneyTrack ctx name = case GameContext.getProgressTrack ctx name of
+      Nothing -> systemMessage tuiOutputChannel (C.msgTrackNotFound C.moveMessages <> name) >> return True
+      Just track -> 
+        if Progress.trackType track /= Progress.Journey
+          then do
+            systemMessage tuiOutputChannel $ "\"" <> name <> "\" não é uma journey track."
+            return True
+          else processJourneyTrack ctx name track
+
+    processJourneyTrack ctx name track
+      | Progress.trackCompleted track = systemMessage tuiOutputChannel "Journey track já está completo!" >> return True
+      | otherwise = do
+          let progressScore = Progress.getProgressScore track  -- Número de boxes preenchidas
+          
+          -- Rolar dados de desafio para o progress roll
+          challengeRolls <- Dice.roll (T.pack "2d10")
+          case challengeRolls of
+            [(_, ch1), (_, ch2)] -> do
+              -- Fazer progress roll usando o movimento ReachYourDestination  
+              let char = GameContext.mainCharacter ctx
+              let attrs = GameContext.attributes char
+              let resources = GameContext.resources char
+              consequences <- Move.executeMoveWithRoll ReachYourDestination Nothing progressScore (ch1, ch2) attrs resources
+              
+              -- Processar consequências
+              processConsequences tuiOutputChannel consequences ctx
+              
+              -- Se foi bem-sucedido, marcar a track como completa e dar experiência
+              let wasSuccess = any isSuccessConsequence consequences
+              when wasSuccess $ do
+                completedTrack <- Progress.completeTrack track
+                updatedCtx <- GameContext.updateProgressTrack ctx name completedTrack
+                _ <- GameContext.saveContext updatedCtx
+                
+                -- Dar experiência baseada no rank
+                let expGained = Progress.getRankExperienceValue (Progress.trackRank track)
+                _ <- process tuiOutputChannel AddResource ("experience:+" <> T.pack (show expGained))
+                systemMessage tuiOutputChannel $ "Jornada concluída! Ganhou " <> T.pack (show expGained) <> " XP."
+              
+              return True
+            _ -> do
+              systemMessage tuiOutputChannel "Erro ao rolar dados de desafio."
+              return True
+    
+    -- Verifica se houve sucesso (Strong Hit ou Weak Hit)
+    isSuccessConsequence :: Consequence -> Bool
+    isSuccessConsequence (Narrative text) = 
+      T.isInfixOf "chega ao seu destino" text || T.isInfixOf "chega ao destino" text
+    isSuccessConsequence _ = False
+    
+    nonEmpty s = if T.null s then Nothing else Just s
+
+
+markProgress :: TChan GameOutput -> T.Text -> IO Bool
+markProgress tuiOutputChannel input = withContext $ \ctx -> do
+  case parseProgressInput input of
+    Nothing -> do
+      systemMessage tuiOutputChannel "Uso: :progress \"<nome do track>\" [número de ticks]"
+      systemMessage tuiOutputChannel "Exemplos: :progress \"Piratas\" 15  ou  :progress \"Vila Próxima\""
+      return True
+    Just (trackName, maybeTicks) -> handleTrackName ctx trackName maybeTicks
+  where
+    -- Parse input para separar nome da track do número de ticks opcional
+    parseProgressInput :: T.Text -> Maybe (T.Text, Maybe Int)
+    parseProgressInput txt = 
+      case Parser.parseQuotedString (T.strip txt) of
+        Just (name, rest) -> 
+          let ticksText = T.strip rest
+          in if T.null ticksText
+               then Just (name, Nothing)
+               else case TR.decimal ticksText of
+                 Right (n, _) -> Just (name, Just n)
+                 Left _ -> Just (name, Nothing)  -- Ignora texto inválido e usa progresso padrão
+        Nothing -> 
+          let parts = T.words (T.strip txt)
+          in case parts of
+               [] -> Nothing
+               [name] -> Just (name, Nothing)
+               (name:ticksStr:_) -> case TR.decimal ticksStr of
+                 Right (n, _) -> Just (name, Just n)
+                 Left _ -> Just (name, Nothing)
+
+    handleTrackName ctx name maybeTicks = case GameContext.getProgressTrack ctx name of
+      Nothing -> systemMessage tuiOutputChannel (C.msgTrackNotFound C.moveMessages <> name) >> return True
+      Just track -> processTrack ctx name track maybeTicks
+
+    processTrack ctx name track maybeTicks
       | Progress.trackCompleted track = systemMessage tuiOutputChannel "Track já está completo!" >> return True
       | otherwise = do
-          updatedTrack <- Progress.markProgress track
+          updatedTrack <- case maybeTicks of
+            Nothing -> Progress.markProgress track  -- Progresso padrão baseado no rank
+            Just ticks -> Progress.markProgressTicks track ticks  -- Número específico de ticks
+          
           updatedCtx <- GameContext.updateProgressTrack ctx name updatedTrack
           _ <- GameContext.saveContext updatedCtx
           let boxes = Progress.getProgressScore updatedTrack
-          let ticks = Progress.trackTicks updatedTrack
+          let totalTicks = Progress.trackTicks updatedTrack
+          let progressType = case maybeTicks of
+                Nothing -> "progresso padrão"
+                Just ticks -> T.pack (show ticks) <> " ticks"
           let msg =
-                "[+] Progresso marcado: "
+                "[+] Progresso marcado em "
                   <> name
                   <> " ("
+                  <> progressType
+                  <> "): "
                   <> T.pack (show boxes)
-                  <> "/10 boxes, "
-                  <> T.pack (show ticks)
+                  <> "/10 boxes ("
+                  <> T.pack (show totalTicks)
                   <> "/40 ticks)"
           _ <- process tuiOutputChannel AddStoryLog msg
 
-          
+          -- Multiplayer sync
           when (GameContext.isMultiplayer updatedCtx) $ case Progress.trackType track of
             Progress.Combat -> syncProgressTrack tuiOutputChannel updatedCtx name updatedTrack
             Progress.Journey -> syncProgressTrack tuiOutputChannel updatedCtx name updatedTrack
             Progress.Vow -> do
-              
               let oldTicks = Progress.trackTicks track
               let newTicks = Progress.trackTicks updatedTrack
               when (newTicks > oldTicks) $ do
@@ -1112,8 +1450,6 @@ markProgress tuiOutputChannel input = withContext $ \ctx -> do
             _ -> return ()
 
           return True
-
-    nonEmpty s = if T.null s then Nothing else Just s
 
 
 rollProgress :: TChan GameOutput -> T.Text -> IO Bool

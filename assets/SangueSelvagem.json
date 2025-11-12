@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Sangue Selvagem",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Spiritus Silvarum",
+            "description": "Quando Enfrentar o Perigo, Garantir uma Vantagem ou Coletar Informações usando conhecimento da floresta ou rastreamento, adicione +1."
+        },
+        {
+            "index": 2,
+            "skillName": "Umbra Nemorum",
+            "description": "Quando Enfrentar o Perigo ou Garantir uma Vantagem ao se esconder ou adentrar florestas, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Hospitium Naturae",
+            "description": "Quando Montar Acampamento nas florestas, pode rolar +centelha em vez de +suprimentos; se o fizer, você e seus aliados podem escolher uma opção a mais com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

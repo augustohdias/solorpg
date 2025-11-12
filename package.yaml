@@ -54,6 +54,29 @@ ghc-options:
 
 library:
   source-dirs: src
+  exposed-modules:
+    - MainLoop
+    - System.Action
+    - System.AssetLoader
+    - System.ConsequenceContract
+    - System.Constants
+    - System.Dice
+    - System.GameContext
+    - System.Help
+    - System.Move
+    - System.Network
+    - System.Network.Client
+    - System.Network.NetworkState
+    - System.Network.Protocol
+    - System.Network.Server
+    - System.Network.Types
+    - System.Oracle
+    - System.Progress
+    - System.Tui.Comm
+    - System.Util.Parser
+    - System.Util.SafeIO
+    - Types
+    - UI
 
 executables:
   SoloRPG-exe:

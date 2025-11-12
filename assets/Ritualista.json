@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Ritualista",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Praeparatio Sacra",
+            "description": "Quando Garantir uma Vantagem para preparar-se para um ritual, imagine sua preparação. Adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Sanguis Offertus",
+            "description": "Quando realizar um ritual, pode sofrer -1 em suprimentos e adicionar +1 ao teste (decida antes de rolar)."
+        },
+        {
+            "index": 3,
+            "skillName": "Scriptura Corporis",
+            "description": "Quando tatuar a essência de um novo ritual em sua pele, imagine a marca. Você pode adquirir e evoluir esse ritual por 1 ponto de experiência a menos."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Construtor",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Ars Faber",
+            "description": "Quando Garantir uma Vantagem criando um item útil ou Enfrentar o Perigo para consertar algo em situação arriscada, adicione +1 e receba +1 em momentum com um sucesso decisivo."
+        },
+        {
+            "index": 2,
+            "skillName": "Labor Periculosus",
+            "description": "Como descrito acima, e você pode sofrer -1 em suprimentos (depois de rolar) para obter +1 adicional."
+        },
+        {
+            "index": 3,
+            "skillName": "Donum Cordis",
+            "description": "Quando oferecer um item que criou como presente para celebrar um vínculo, pode rolar novamente qualquer dado ao fazer Convencer, Forjar um Vínculo ou Testar seu Vínculo (uma vez)."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

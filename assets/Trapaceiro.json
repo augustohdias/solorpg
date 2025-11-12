@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Trapaceiro",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Ars Dolosa",
+            "description": "Quando Enfrentar o Perigo, Garantir uma Vantagem ou Convencer para mentir, blefar ou roubar, adicione +1."
+        },
+        {
+            "index": 2,
+            "skillName": "Fraus Revelata",
+            "description": "Quando Coletar Informações sobre um esquema desonesto, pode rolar +sombra em vez de +centelha e receber +2 em momentum com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Veritas Confessa",
+            "description": "Quando confessar uma mentira ao Forjar um Vínculo, arrisque rejeição por um laço mais forte. Com sucesso decisivo, receba +2 em momentum e marque um traço; sucesso parcial é considerado falha."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Localizador de Caminhos",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Iter Cognitum",
+            "description": "Quando Empreender uma Jornada e queimar momentum para melhorar o resultado, receba +2 em momentum após reiniciar sua trilha."
+        },
+        {
+            "index": 2,
+            "skillName": "Terra Inspecta",
+            "description": "Quando Garantir uma Vantagem ou Coletar Informações inspecionando a paisagem, adicione +1 e receba +1 com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Dux Fidelis",
+            "description": "Quando Juramentar um Voto de Ferro para guiar alguém em segurança, pode rolar novamente qualquer dado. Ao Cumprir o Voto e marcar experiência, receba +1 em experiência."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

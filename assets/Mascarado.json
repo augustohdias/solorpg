@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Mascarado",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Persona Arboris",
+            "description": "Quando usar a máscara e fizer um movimento que utilize seu atributo, adicione +1. Se o resultado da sua rolagem for 1 no dado de ação, sofra -1 na trilha associada."
+        },
+        {
+            "index": 2,
+            "skillName": "Visio Occulta",
+            "description": "Como acima, e você pode adicionar +2 e sofrer -2 (decida antes de rolar)."
+        },
+        {
+            "index": 3,
+            "skillName": "Mors Larvata",
+            "description": "Quando fizer o movimento Enfrentar a Morte ou Enfrentar a Desolação usando a máscara, pode rolar +seu atributo em vez de +coração."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Tecelão de Histórias",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Carmina Narrata",
+            "description": "Quando Garantir uma Vantagem, Convencer ou Forjar um Vínculo ao compartilhar uma canção, poema ou conto, adicione +1 e receba +1 com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Fabula Spiritus",
+            "description": "Quando Montar Acampamento e escolher descansar, pode compartilhar uma história e receber +1 em espírito ou +1 em impulso. Aliados que descansarem com você também recebem o bônus."
+        },
+        {
+            "index": 3,
+            "skillName": "Historia Communitatis",
+            "description": "Quando fizer o movimento Estadia em uma comunidade com a qual compartilha um vínculo, adicione +2 (em vez de +1)."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

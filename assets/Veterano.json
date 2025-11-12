@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Veterano",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Experientia Belli",
+            "description": "Quando queimar momentum para melhorar um resultado em combate, receba +1 em momentum após reiniciar sua trilha."
+        },
+        {
+            "index": 2,
+            "skillName": "Fides Commilitonum",
+            "description": "Quando Juramentar um Voto de Ferro a alguém que lutou ao seu lado ou Forjar um Vínculo com ele, adicione +2 e receba +2 em momentum com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Praeda Bellatoris",
+            "description": "Quando Reabastecer ao pilhar um morto em campo de batalha, adicione +1 e receba +1 em momentum com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

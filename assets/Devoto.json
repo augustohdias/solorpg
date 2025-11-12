@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Devoto",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Oratio Divina",
+            "description": "Quando você fizer suas orações diárias, pode fazer o movimento Garantir uma Vantagem ao pedir uma bênção a seu deus. Role +o atributo do seu deus. Com um sucesso, receba +1 em momentum."
+        },
+        {
+            "index": 2,
+            "skillName": "Votum Fidei",
+            "description": "Quando você Juramentar um Voto de Ferro para servir seu deus em uma missão divina, role +o atributo do seu deus e role novamente qualquer dado. Quando Cumprir seu Voto e marcar experiência, receba +1 em experiência."
+        },
+        {
+            "index": 3,
+            "skillName": "Verbum Dei",
+            "description": "Quando fizer o movimento Estadia e espalhar a palavra do seu deus, role +o atributo do seu deus. Com um sucesso, receba +1 em momentum."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

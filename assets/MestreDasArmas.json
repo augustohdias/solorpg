@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Mestre das Armas",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Judicium Hostis",
+            "description": "Quando Garantir uma Vantagem por avaliar um inimigo em uma briga ou situação de combate, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Doctrina Ferri",
+            "description": "Quando estuda ou treina com uma nova arma ou técnica, pode adquirir e evoluir o talento de combate correspondente por 1 ponto de experiência a menos."
+        },
+        {
+            "index": 3,
+            "skillName": "Mutatio Subita",
+            "description": "Quando fizer o movimento Virar a Maré mudando de arma ou técnica, e se o próximo movimento for Atacar, adicione +1 e cause +2 de dano com um sucesso decisivo."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

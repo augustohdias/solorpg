@@ -111,16 +111,10 @@ progressPercentage track =
 markProgress :: ProgressTrack -> IO ProgressTrack
 markProgress track
   | trackCompleted track = do
-      putStrLn "  → Track já está completo!"
       return track
   | otherwise = do
       let ticksToAdd = getTicksForRank (trackRank track)
       let newTicks = min 40 (trackTicks track + ticksToAdd)
-      let boxesFilled = newTicks `div` 4
-      
-      putStrLn $ "  → Marcou " ++ show ticksToAdd ++ " ticks"
-      putStrLn $ "  → Progresso: " ++ show boxesFilled ++ "/10 boxes (" ++ show newTicks ++ "/40 ticks)"
-      
       return $ track { trackTicks = newTicks }
 
 

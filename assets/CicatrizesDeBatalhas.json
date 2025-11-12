@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Cicatrizes de Batalhas",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Vires Vulnerum",
+            "description": "Você concentra suas energias: reduza seu gume ou ferro em 1 e adicione +2 em centelha ou em coração, ou +1 em cada um (até o máximo de +4)."
+        },
+        {
+            "index": 2,
+            "skillName": "Fortitudo Doloris",
+            "description": "Você supera suas limitações: reduza seu máximo de saúde ou de espírito em 1 e ignore a penalidade máxima em momentum por estar mutilado."
+        },
+        {
+            "index": 3,
+            "skillName": "Mors Superata",
+            "description": "Você já encarou a morte antes: quando sua saúde for reduzida a 0, receba +1 em momentum. Quando você Enfrentar a Morte, adicione +1."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

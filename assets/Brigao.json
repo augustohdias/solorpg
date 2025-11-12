@@ -1,0 +1,24 @@
+{
+    "type": "COMBAT_TALENT",
+    "name": "Brigão",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Pugnator",
+            "description": "Quando você fizer o movimento Garantir uma Vantagem +ferro para engajar numa briga de perto (como bater, saltar ou esmagar), adicione +1. Se o resultado for um sucesso, você também pode causar 1 de dano."
+        },
+        {
+            "index": 2,
+            "skillName": "Ferire Brutaliter",
+            "description": "Quando você fizer o movimento Atacar ou Confrontar com uma intenção brutal, você pode causar 2 de dano em vez de 1."
+        },
+        {
+            "index": 3,
+            "skillName": "Defensio Corporalis",
+            "description": "Quando você fizer o movimento Enfrentar o Perigo ou Confrontar contra um ataque de briga (como socos, pontapés ou agarrões), adicione +1."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

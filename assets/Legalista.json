@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Legalista",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Concordia Fratrum",
+            "description": "Quando fizer o movimento Ajudar seu Aliado, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Fidelitas Amicorum",
+            "description": "Quando um aliado fizer o movimento Suportar Estresse em sua companhia, ele adiciona +1 e você recebe +1 em momentum com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Soliditas Cordis",
+            "description": "Quando ficar ao lado de um aliado e ele fizer um movimento de progresso, imagine como você o apoia. Role um dado de desafio; com 1–9, ele substitui um de seus dados de desafio pelo seu."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

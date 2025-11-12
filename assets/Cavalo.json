@@ -1,0 +1,24 @@
+{
+    "type": "COMPANION",
+    "name": "Cavalo",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Velox",
+            "description": "Quando você fizer o movimento Enfrentar o Perigo role +gume usando a velocidade e a graça do seu cavalo ou, quando você Empreender uma Jornada, adicione +1."
+        },
+        {
+            "index": 2,
+            "skillName": "Intrepidus",
+            "description": "Quando você fizer o movimento Entrar numa Briga ou Garantir uma Vantagem role +coração para empregar carga num combate, adicione +1 e receba +1 momentum com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Potens",
+            "description": "Quando você fizer o movimento Atacar ou Confrontar a uma distância próxima enquanto estiver montado, adicione +1 e cause +1 de dano com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

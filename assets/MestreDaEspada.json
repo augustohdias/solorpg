@@ -1,0 +1,24 @@
+{
+    "type": "RITUAL",
+    "name": "Mestre da Espada",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Dominus Gladii",
+            "description": "Quando você fizer o movimento Atacar ou Confrontar e queimar momentum para melhorar o resultado, cause +2 de dano."
+        },
+        {
+            "index": 2,
+            "skillName": "Momentum Ensis",
+            "description": "Quando você fizer o movimento Confrontar e marcar sucesso decisivo, você pode adicionar +1 se seguir imediatamente com o movimento Atacar."
+        },
+        {
+            "index": 3,
+            "skillName": "Votum Ferri",
+            "description": "Quando você fizer o movimento Juramentar um Voto de Ferro ajoelhando-se e segurando a lâmina da sua espada, adicione +1 e receba +1 em momentum com um sucesso. Se deixar o fio da lâmina tirar sangue das suas mãos, faça Suportar Dano (1 dano) em troca de adicionar +1 em momentum."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

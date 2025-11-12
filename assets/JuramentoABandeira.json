@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Juramento à Bandeira",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Vinculum Signi",
+            "description": "Quando você fizer o movimento Estadia ou Montar Acampamento na companhia da sua bandeira de família, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Fides Ducis",
+            "description": "Quando você Juramentar um Voto de Ferro para servir seu líder ou facção em uma missão, você pode rolar novamente qualquer dado. Quando você Cumprir seu Voto e marcar experiência, receba +1 em experiência."
+        },
+        {
+            "index": 3,
+            "skillName": "Virtus Signiferi",
+            "description": "Quando você Entrar numa Briga carregando sua bandeira, adicione +1 e receba +1 em momentum com um sucesso. Quando você queimar momentum enquanto carregar sua bandeira em combate, receba +1 em momentum depois de reiniciar."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

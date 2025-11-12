@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Vinculado à Lâmina",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Anima Ferri",
+            "description": "Quando você Entrar numa Briga ou Desenhar o Círculo enquanto empunhar sua lâmina de família, receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Sussurra Ferrum",
+            "description": "Quando você Coletar Informações e falhar em obter um sucesso decisivo, pode ouvir os sussurros da sua lâmina ancestral e rolar novamente qualquer dado. Se o fizer, faça o movimento Suportar Estresse (2 estresses)."
+        },
+        {
+            "index": 3,
+            "skillName": "Gloria Cruoris",
+            "description": "Quando você causar dano com sua lâmina de família, pode causar +2 de dano. Se o fizer, faça o movimento Suportar Estresse (2 estresses)."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

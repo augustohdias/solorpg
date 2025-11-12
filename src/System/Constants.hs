@@ -277,6 +277,7 @@ data MoveMessages = MoveMessages
   , msgTrackNotFound :: T.Text
   , msgVowUsage :: String
   , msgCombatTrackUsage :: String
+  , msgJourneyTrackUsage :: String
   , msgProgressUsage :: String
   , msgNoTracksActive :: String
   , msgTracksHeader :: String
@@ -294,6 +295,7 @@ data MoveMessages = MoveMessages
   , formatOracleIndex :: T.Text -> Int -> T.Text -> String
   , formatVowCreated :: T.Text -> String -> Int -> String
   , formatCombatTrackCreated :: T.Text -> String -> Int -> String
+  , formatJourneyTrackCreated :: T.Text -> String -> Int -> String
   , formatProgressTrack :: T.Text -> String -> String -> Int -> Int -> Double -> Bool -> String
   , formatOracleComplete :: T.Text -> T.Text -> T.Text -> [(Int, Int, T.Text)] -> String
   , msgUndertakeJourney :: String
@@ -318,7 +320,9 @@ moveMessages = MoveMessages
   , msgCombatTrackUsage = "Uso: :combat \"<nome do inimigo>\" <rank>\n\
                           \Ranks: troublesome, dangerous, formidable, extreme, epic\n\
                           \Exemplo: :combat \"Lobo Perigoso\" dangerous"
-  , msgProgressUsage = "Use :tracks para ver tracks ativos"
+  , msgProgressUsage = "Uso: :progress \"<nome do track>\" [número de ticks]\n\
+                      \Exemplos: :progress \"Piratas\" 15  ou  :progress \"Vila Próxima\"\n\
+                      \Use :tracks para ver tracks ativos"
   , msgNoTracksActive = "\nNenhum progress track ativo."
   , msgTracksHeader = "\n=== Progress Tracks Ativos ==="
   , msgExecutingPayThePrice = "\n>>> Executando Pagar o Preço..."
@@ -347,7 +351,7 @@ moveMessages = MoveMessages
       ]
   , formatVowCreated = \name rank ticks -> unlines
       [ ""
-      , "[+] Voto criado: " ++ T.unpack name ++ " (" ++ rank ++ ")"
+      , "~[+] Voto criado: " ++ T.unpack name ++ " (" ++ rank ++ ")"
       , "  Progresso por mark: " ++ show ticks ++ " ticks"
       ]
   , formatCombatTrackCreated = \name rank ticks -> unlines
@@ -367,7 +371,15 @@ moveMessages = MoveMessages
       , "  " ++ bar ++ " " ++ show (round percentage :: Int) ++ "%"
       ]
   , msgUndertakeJourney = "Undertake a Journey requer journey track ativo\n\
-                          \Use :vow para criar journey primeiro ou especifique nome"
+                          \Use :journey para criar journey primeiro ou especifique nome"
+  , msgJourneyTrackUsage = "Uso: :journey \"<destino>\" <rank>\n\
+                           \Ranks: troublesome, dangerous, formidable, extreme, epic\n\
+                           \Exemplo: :journey \"Cidade Distante\" dangerous"
+  , formatJourneyTrackCreated = \name rank ticks -> unlines
+      [ ""
+      , "[+] Journey Track criado: " ++ T.unpack name ++ " (" ++ rank ++ ")"
+      , "  Progresso por waypoint: " ++ show ticks ++ " ticks"
+      ]
   , formatOracleComplete = \name desc dice entries ->
       let entryLines = map (\(low, high, text) ->
             "  " ++ show low ++ "-" ++ show high ++ ": " ++ T.unpack text) entries

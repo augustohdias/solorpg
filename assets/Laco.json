@@ -1,0 +1,24 @@
+{
+    "type": "RITUAL",
+    "name": "Laço",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Pellis Lunaris",
+            "description": "Quando você usar uma pele de animal e dançar sob o luar, role +centelha. Com sucesso decisivo, você ou um aliado pode usar a pele e adicionar +1 quando fizer movimentos com o atributo relacionado (lobo-gume; urso-ferro; cervo-coração; raposa-sombra; javali-centelha). Se o usuário obtiver 1 no dado de ação, a magia é perdida. Com sucesso parcial, a natureza selvagem reclama sua forma; faça Suportar Estresse (2 estresses)."
+        },
+        {
+            "index": 2,
+            "skillName": "Metamorphosis Bestiae",
+            "description": "Como descrito acima, e você pode realizar este ritual vestindo a pele de uma fera. Se o fizer, nomeie o atributo relacionado e adicione +2 em vez de +1."
+        },
+        {
+            "index": 3,
+            "skillName": "Spiritus Bestiarum",
+            "description": "Quando realizar esse ritual, adicione +1 e receba +1 em momentum com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

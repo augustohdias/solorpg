@@ -1,0 +1,24 @@
+{
+    "type": "COMBAT_TALENT",
+    "name": "Braço Longo",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Contus",
+            "description": "Quando você fizer o movimento Enfrentar o Perigo impedindo um inimigo de se aproximar através do alcance da sua lança, role +ferro ou +gume (à sua escolha). Com sucesso decisivo, escolha: Ferro — faça o movimento Atacar agora e adicione +1; Gume — receba +1 em momentum."
+        },
+        {
+            "index": 2,
+            "skillName": "Ictus Validus",
+            "description": "Quando você fizer o movimento Atacar ou Confrontar próximo ao alvo e marcar um sucesso decisivo, você pode estocar sua lança e causar +2 de dano. Se a luta continuar, faça Enfrentar o Perigo +ferro para recuperar a lança."
+        },
+        {
+            "index": 3,
+            "skillName": "Praesidium",
+            "description": "Quando fizer o movimento Garantir uma Vantagem para reforçar sua lança contra um inimigo em carga, adicione +1 e receba +1 em momentum com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

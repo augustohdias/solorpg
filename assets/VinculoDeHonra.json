@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Vínculo de Honra",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Virtus Iurisiurandi",
+            "description": "Quando fizer o movimento Virar a Maré, imagine como seus votos lhe concedem força neste momento. Adicione +2 (em vez de +1)."
+        },
+        {
+            "index": 2,
+            "skillName": "Veritas Dura",
+            "description": "Quando fizer o movimento Garantir uma Vantagem ou Convencer dizendo uma dura verdade, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 3,
+            "skillName": "Fides Restituta",
+            "description": "Quando Cumprir seu Voto e marcar um sucesso parcial ou uma falha, você pode rolar novamente qualquer dado ao Juramentar um novo Voto para acertar as coisas. Com um sucesso, receba +2 em momentum."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

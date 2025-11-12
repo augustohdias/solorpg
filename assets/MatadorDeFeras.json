@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Matador de Feras",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Venatio Magna",
+            "description": "Quando fizer o movimento Coletar Informações para rastrear uma fera ou horror, ou Garantir uma Vantagem ao se preparar para lutar contra ele, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Votum Caedis",
+            "description": "Quando Juramentar um Voto de Ferro para matar uma fera ou horror, pode rolar novamente qualquer dado. Ao Cumprir o Voto e marcar experiência, receba +1 em experiência."
+        },
+        {
+            "index": 3,
+            "skillName": "Trophæum Bestiæ",
+            "description": "Quando matar uma fera ou horror, pode fazer um troféu. Escolha: empoderar um ritual (role novamente qualquer dado uma vez) ou provar seu valor (role novamente qualquer dado ao fazer Estadia)."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

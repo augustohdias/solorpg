@@ -1,0 +1,24 @@
+{
+    "type": "COMBAT_TALENT",
+    "name": "Degolador",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Assassinus",
+            "description": "Quando você estiver em posição de executar o movimento Atacar um inimigo desavisado, escolha uma das opções: adicione +2 e receba +1 em momentum com um sucesso, ou cause +2 de dano com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Fiducia Ferri",
+            "description": "Quando você fizer o movimento Convencer alguém a se aproximar da sua lâmina ou quando confiar nela para o movimento Enfrentar o Perigo, adicione +1."
+        },
+        {
+            "index": 3,
+            "skillName": "Finta Umbrarum",
+            "description": "Uma vez por luta, quando você fizer o movimento Garantir uma Vantagem +sombra para aplicar uma finta ou desorientação, role novamente qualquer dado e receba +1 em momentum com um sucesso."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

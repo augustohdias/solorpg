@@ -1,0 +1,24 @@
+{
+    "type": "COMPANION",
+    "name": "Cão de Caça",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Acutus",
+            "description": "Quando você fizer o movimento Coletar Informações usando os sentidos aguçados do seu cão para rastrear sua presa ou investigar uma cena, adicione +1 e receba +1 em momentum com um sucesso."
+        },
+        {
+            "index": 2,
+            "skillName": "Vigilans",
+            "description": "Quando você fizer o movimento Enfrentar o Perigo role +centelha para detectar uma ameaça que se aproxima ou, quando você Entrar numa Briga role +centelha contra uma emboscada, adicione +2."
+        },
+        {
+            "index": 3,
+            "skillName": "Fidelis",
+            "description": "Quando você fizer o movimento Suportar Estresse na companhia do seu cão, adicione +1."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}

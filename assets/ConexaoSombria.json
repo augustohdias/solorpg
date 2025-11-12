@@ -1,0 +1,24 @@
+{
+    "type": "CAMINHO",
+    "name": "Conexão Sombria",
+    "skills": [
+        {
+            "index": 1,
+            "skillName": "Cor Tenebris",
+            "description": "Endureça seu coração: reduza 1 ponto do atributo coração e adicione +2 ao atributo sombra (até o máximo de +4)."
+        },
+        {
+            "index": 2,
+            "skillName": "Affinitas Umbrarum",
+            "description": "Você está sintonizado com os reinos sombrios: quando realizar um ritual, adicione +1."
+        },
+        {
+            "index": 3,
+            "skillName": "Ars Mortis",
+            "description": "Quando fizer o movimento Enfrentar a Morte, pode rolar +sombra em vez de +coração. Você também pode sofrer -1 em momentum e adicionar +1 (decida antes de rolar)."
+        }
+    ],
+    "enabledSkills": [
+        1
+    ]
+}
