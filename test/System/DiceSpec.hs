@@ -125,6 +125,6 @@ spec = describe "System.Dice" $ do
             "Strong Hit!"
             "Weak Hit!"
             "Miss!"
-            "Match!"
+            "[!]"
       T.unpack formatted `shouldContain` "Action: 5"
       T.unpack formatted `shouldContain` "Strong Hit!"

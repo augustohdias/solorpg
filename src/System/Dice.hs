@@ -133,9 +133,9 @@ formatChallengeResult result formatActionRoll strongHit weakHit miss matchMsg =
                       } = result
   
       resultMsg = case rollResult of
-        StrongHit -> "STRONG HIT"
-        WeakHit -> "WEAK HIT"
-        Miss -> "MISS"
+        StrongHit -> "SUCESSO"
+        WeakHit -> "SUCESSO  PARCIAL"
+        Miss -> "FALHA"
         InvalidRoll -> "INVALID ROLL"
   
       interpretation = case rollResult of

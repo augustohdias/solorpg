@@ -87,9 +87,10 @@ data TuiState = TuiState
     connectedPlayers :: [T.Text]
   }
 
-choiceSelectedAttr, choiceDisabledAttr :: AttrName
+choiceSelectedAttr, choiceDisabledAttr, borderSelectedAttr :: AttrName
 choiceSelectedAttr = attrName "choiceSelected"
 choiceDisabledAttr = attrName "choiceDisabled"
+borderSelectedAttr = attrName "borderSelected"
 
 app :: App TuiState GameOutput Name
 app =
@@ -103,7 +104,8 @@ app =
           attrMap
             Vty.defAttr
             [ (choiceSelectedAttr, Vty.defAttr `Vty.withStyle` Vty.reverseVideo),
-              (choiceDisabledAttr, Vty.defAttr `Vty.withForeColor` Vty.brightBlack)
+              (choiceDisabledAttr, Vty.defAttr `Vty.withForeColor` Vty.brightBlack),
+              (borderSelectedAttr, Vty.defAttr `Vty.withForeColor` Vty.brightBlue)
             ]
     }
 
@@ -162,17 +164,31 @@ drawTui ts =
     header = drawHeader (character ts) (viewportFocus ts) (multiplayerStatus ts) (connectedPlayers ts)
     mainContent = hBox [leftPanel, logPanel, systemPanel]
     leftPanel = vBox [charSheet, cardsSheet]
-    cardsSheet = vLimit charSheetWidth $ hLimit charSheetWidth $ borderWithLabel (str " Cartas ") $ padAll 1 $ drawCards (character ts) (viewportFocus ts) (cardsSelection ts)
+    cardsSheet = 
+      let isCardsFocused = F.focusGetCurrent (viewportFocus ts) == Just CardsViewport
+          borderWidget = if isCardsFocused
+            then withAttr borderSelectedAttr . borderWithLabel (str " Cartas ")
+            else borderWithLabel (str " Cartas ")
+      in vLimit charSheetWidth $ hLimit charSheetWidth $ borderWidget $ padAll 1 $ drawCards (character ts) (viewportFocus ts) (cardsSelection ts)
     charSheet = vLimit charSheetWidth $ hLimit charSheetWidth $ borderWithLabel (str " Personagem ") $ padAll 1 $ drawCharacter (character ts)
 
     logPanel =
-      withVScrollBars OnRight $
-        viewport LogViewport Vertical $
-          vBox (intersperse (str " ") (map txtWrap (Vec.toList $ logs ts)))
+      let isLogFocused = F.focusGetCurrent (viewportFocus ts) == Just LogViewport
+          borderWidget = if isLogFocused 
+            then withAttr borderSelectedAttr . borderWithLabel (str " Log ")
+            else borderWithLabel (str " Log ")
+      in borderWidget $
+        withVScrollBars OnRight $
+          viewport LogViewport Vertical $
+            vBox (intersperse (str " ") (map txtWrap (Vec.toList $ logs ts)))
 
     systemPanel =
-      hLimit systemSheetWidth $
-        borderWithLabel (str " Sistema ") $
+      let isSystemFocused = F.focusGetCurrent (viewportFocus ts) == Just SystemViewport
+          borderWidget = if isSystemFocused
+            then withAttr borderSelectedAttr . borderWithLabel (str " Sistema ")
+            else borderWithLabel (str " Sistema ")
+      in hLimit systemSheetWidth $
+        borderWidget $
           padAll 1 $
             withVScrollBars OnRight $
               viewport SystemViewport Vertical $

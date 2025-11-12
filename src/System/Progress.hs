@@ -222,12 +222,12 @@ formatProgressRollResult result pType =
       hasMatch = progressMatch result
 
       resultMsg = case rollResult of
-        Dice.StrongHit -> "[+] STRONG HIT"
-        Dice.WeakHit -> "[~] WEAK HIT"
-        Dice.Miss -> "[X] MISS"
+        Dice.StrongHit -> "[+] Sucesso Total!"
+        Dice.WeakHit -> "[~] Sucesso Parcial!"
+        Dice.Miss -> "[X] Falha!"
         Dice.InvalidRoll -> "INVALID"
 
-      matchMsg = if hasMatch then "\n[!] MATCH!" else ""
+      matchMsg = if hasMatch then "\n[!]" else ""
 
       interpretation = case (pType, rollResult) of
         (Vow, Dice.StrongHit) -> C.vowStrongHit C.progressInterpretation

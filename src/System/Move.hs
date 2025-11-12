@@ -79,7 +79,7 @@ executeMoveWithRoll moveType maybeStat actionDie (ch1, ch2) attrs _resources = d
               ++ "\n"
               ++ "Resultado: "
               ++ showRollResult rollResult
-              ++ (if isMatch then "\n[!] MATCH detectado!" else "")
+              ++ (if isMatch then "\n[!]" else "")
 
   return $ rollInfo : consequences
 
@@ -98,9 +98,9 @@ evaluateRoll action ch1 ch2
   | otherwise = Dice.Miss
 
 showRollResult :: Dice.RollResult -> String
-showRollResult Dice.StrongHit = "[+] STRONG HIT"
-showRollResult Dice.WeakHit = "[~] WEAK HIT"
-showRollResult Dice.Miss = "[X] MISS"
+showRollResult Dice.StrongHit = "[+] Sucesso Total!"
+showRollResult Dice.WeakHit = "[~] Sucesso Parcial!"
+showRollResult Dice.Miss = "[X] Falha!"
 showRollResult Dice.InvalidRoll = "INVALID"
 
 getMoveConsequences :: MoveType -> Dice.RollResult -> Bool -> IO [Consequence]

@@ -397,7 +397,7 @@ characterDisplay = CharacterDisplay
   , formatActionRoll = \actionDie ch1 ch2 resultMsg ->
       unlines
         [ ""
-        , "=== Action Roll ==="
+        , "=== Desafio ==="
         , "Action Die: " ++ show actionDie
         , "Challenge Dice: " ++ show ch1 ++ ", " ++ show ch2
         , ""
@@ -478,12 +478,12 @@ data ProgressInterpretation = ProgressInterpretation
 progressInterpretation :: ProgressInterpretation
 progressInterpretation = ProgressInterpretation
   { vowStrongHit = unlines
-      [ "[+] STRONG HIT"
+      [ "[+] Sucesso Total!"
       , "Seu voto está cumprido. Marque experiência (rank do voto)."
       , "Você pode Forge a Bond (se apropriado)."
       ]
   , vowWeakHit = unlines
-      [ "[~] WEAK HIT"
+      [ "[~] Sucesso Parcial!"
       , "Seu voto está cumprido, mas há uma complicação."
       , "Marque experiência (rank -1, mínimo 1)."
       , "Escolha um:"
@@ -491,7 +491,7 @@ progressInterpretation = ProgressInterpretation
       , "  • Adicione complicação à narrativa"
       ]
   , vowMiss = unlines
-      [ "[X] MISS"
+      [ "[X] Falha!"
       , "Seu voto ainda não está cumprido."
       , "Limpe todo o progresso e escolha:"
       , "  • Reafirme o voto: sofra -2 spirit"
@@ -499,32 +499,32 @@ progressInterpretation = ProgressInterpretation
       ]
 
   , combatStrongHit = unlines
-      [ "[+] STRONG HIT"
+      [ "[+] Sucesso Total!"
       , "O combate termina. Você vence decisivamente."
       ]
   , combatWeakHit = unlines
-      [ "[~] WEAK HIT"
+      [ "[~] Sucesso Parcial!"
       , "O combate termina, mas escolha um:"
       , "  • Sofra harm mas vence"
       , "  • Vitória Pyrrhica (complicação narrativa)"
       ]
   , combatMiss = unlines
-      [ "[X] MISS"
+      [ "[X] Falha!"
       , "Você falha em encerrar o combate."
       , "Pagar o Preço - situação piorou!"
       ]
 
   , journeyStrongHit = unlines
-      [ "[+] STRONG HIT"
+      [ "[+] Sucesso Total!"
       , "Você completa sua jornada."
       , "+1 momentum (se tiver bonds no destino)"
       ]
   , journeyWeakHit = unlines
-      [ "[~] WEAK HIT"
+      [ "[~] Sucesso Parcial!"
       , "Você chega, mas há uma complicação ou custo."
       ]
   , journeyMiss = unlines
-      [ "[X] MISS"
+      [ "[X] Falha!"
       , "Você se perde, sofre um revés, ou a situação piora."
       , "Pagar o Preço"
       ]
@@ -544,11 +544,11 @@ data ChallengeInterpretation = ChallengeInterpretation
 
 challengeInterpretation :: ChallengeInterpretation
 challengeInterpretation = ChallengeInterpretation
-  { challengeHeader = "\n=== Action Roll ==="
+  { challengeHeader = "\n=== Desafio ==="
   , challengeStrongHit = "[+] SUCESSO TOTAL! Você consegue o que quer."
   , challengeWeakHit = "[~] SUCESSO PARCIAL. Você consegue, mas há um custo."
   , challengeMiss = "[X] FALHA. As coisas pioram."
-  , challengeMatch = "\n[!] MATCH! Algo inesperado acontece!"
+  , challengeMatch = "\n[!] Algo inesperado acontece!"
   , challengeExpects3Dice = "Erro: :challenge espera exatamente 3 dados (1d6,2d10)"
   }
 
