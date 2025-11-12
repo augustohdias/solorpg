@@ -37,10 +37,12 @@ module System.GameContext
   , loadContext
   , saveContext
   , getCurrentContext
+  , getContextCache
   , updateAttributes
   , updateResources
   , addWorldData
   , addLogEntry
+  , addSyncLogEntry
   , getSessionLog
   , clearSessionLog
   , addProgressTrack
@@ -143,6 +145,8 @@ data Context = Context
     , progressTracks :: ![Progress.ProgressTrack]  -- ^ Tracks ativos (vows, combats, journeys)
     , activeBonuses :: ![ActiveBonus]   -- ^ Bônus ativos temporários
     , bonds :: ![Bond]                  -- ^ Vínculos com pessoas, comunidades e lugares
+    , isMultiplayer :: !Bool            -- ^ Flag indicando se está em modo multiplayer
+    , multiplayerSessionId :: !(Maybe T.Text)  -- ^ ID da sessão multiplayer (se aplicável)
     } deriving (Show, Eq, Generic, ToJSON)
 
 -- | Instância customizada de FromJSON para Context
@@ -156,8 +160,12 @@ instance FromJSON Context where
     pt <- v .: "progressTracks"
     ab <- v .: "activeBonuses"
     maybeBonds <- v .:? "bonds"
+    maybeMultiplayer <- v .:? "isMultiplayer"
+    maybeSessionId <- v .:? "multiplayerSessionId"
     let _bonds = fromMaybe [] maybeBonds
-    return $ Context mc w sl pt ab _bonds
+    let _isMultiplayer = fromMaybe False maybeMultiplayer
+    let _sessionId = maybeSessionId
+    return $ Context mc w sl pt ab _bonds _isMultiplayer _sessionId
 
 -- | Erros possíveis ao manipular contexto
 data ContextError
@@ -248,6 +256,8 @@ createContext charName attrs = do
                             , progressTracks = []
                             , activeBonuses = []
                             , bonds = []
+                            , isMultiplayer = False
+                            , multiplayerSessionId = Nothing
                             }
 
                     saveResult <- saveContext context
@@ -263,23 +273,25 @@ loadContext :: T.Text -> IO (Either ContextError Context)
 loadContext charName = do
     let fileName = getContextFileName charName
     exists <- doesFileExist fileName
-
+    
     if not exists
         then return $ Left (FileError $ "Arquivo não encontrado: " ++ fileName)
-        else do
-            result <- SafeIO.safeReadFile fileName
-            case result of
-                Left err -> return $ Left (FileError $ show err)
-                Right contents ->
-                    case decode contents of
-                        Nothing -> return $ Left (ParseError "Erro ao parsear JSON")
-                        Just ctx -> do
-                            cache <- getContextCache
-                            modifyResult <- safeModifyMVar cache $ \_ ->
-                                return (Just ctx, ())
-                            case modifyResult of
-                                Left err -> return $ Left (FileError $ "Erro ao atualizar contexto: " ++ show err)
-                                Right _ -> return $ Right ctx
+        else SafeIO.safeReadFile fileName >>= either
+            (return . Left . FileError . show)
+            parseAndUpdateCache
+  where
+    parseAndUpdateCache :: T.Text -> IO (Either ContextError Context)
+    parseAndUpdateCache contents = maybe
+        (return $ Left (ParseError "Erro ao parsear JSON"))
+        updateCache
+        (decode contents)
+    
+    updateCache :: Context -> IO (Either ContextError Context)
+    updateCache ctx = do
+        cache <- getContextCache
+        safeModifyMVar cache (const $ return (Just ctx, ())) >>= either
+            (return . Left . FileError . ("Erro ao atualizar contexto: " ++) . show)
+            (const $ return $ Right ctx)
 
 -- | Salva contexto em arquivo
 saveContext :: Context -> IO (Either ContextError FilePath)
@@ -342,6 +354,11 @@ addLogEntry ctx logEntry = do
     cache <- getContextCache
     modifyMVar cache $ \_ -> return (Just updatedCtx, ())
     return updatedCtx
+
+-- | Adiciona entrada ao log sincronizada (sem trigger de broadcast)
+-- Usado quando recebe logs de outros jogadores via rede
+addSyncLogEntry :: Context -> T.Text -> IO Context
+addSyncLogEntry ctx logEntry = addLogEntry ctx logEntry
 
 -- | Obtém todos os logs do contexto
 getSessionLog :: Context -> [T.Text]

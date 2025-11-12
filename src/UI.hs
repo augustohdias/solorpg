@@ -55,6 +55,13 @@ data ChoicePromptState = ChoicePromptState
     choiceStateError :: Maybe T.Text
   }
 
+-- | Estado do prompt de aprovação de conexão
+data ConnectionPromptState = ConnectionPromptState
+  { connPromptPlayerName :: T.Text
+  , connPromptCharacterName :: T.Text
+  , connPromptSelected :: Int  -- 0 = Sim, 1 = Não
+  }
+
 -- TUI State
 data TuiState = TuiState
   { editor :: Ed.Editor T.Text Name,
@@ -63,7 +70,10 @@ data TuiState = TuiState
     character :: Maybe GameContext.MainCharacter,
     inputChan :: TChan T.Text, -- Channel to send commands to the game loop
     viewportFocus :: F.FocusRing Name, -- Focus ring for viewport scrolling
-    activeChoice :: Maybe ChoicePromptState -- Popup prompting the user
+    activeChoice :: Maybe ChoicePromptState, -- Popup prompting the user
+    activeConnectionPrompt :: Maybe ConnectionPromptState, -- Prompt de aprovação de conexão
+    multiplayerStatus :: Maybe (Bool, T.Text, T.Text), -- (isHost, ip, port) ou (isClient, host, port)
+    connectedPlayers :: [T.Text] -- Lista de jogadores conectados
   }
 
 choiceSelectedAttr, choiceDisabledAttr :: AttrName
@@ -98,7 +108,10 @@ runTui inputChan' outputChan = do
             character = Nothing,
             inputChan = inputChan',
             viewportFocus = F.focusRing [LogViewport, SystemViewport], -- Start with LogViewport focused
-            activeChoice = Nothing
+            activeChoice = Nothing,
+            activeConnectionPrompt = Nothing,
+            multiplayerStatus = Nothing,
+            connectedPlayers = []
           }
 
   eventChan <- newBChan 10
@@ -137,12 +150,13 @@ charSheetWidth = 25
 -- Main drawing function
 drawTui :: TuiState -> [Widget Name]
 drawTui ts =
-  case activeChoice ts of
-    Nothing -> [baseUi]
-    Just choiceState -> [renderChoicePopup choiceState, baseUi]
+  case (activeChoice ts, activeConnectionPrompt ts) of
+    (Just choiceState, _) -> [renderChoicePopup choiceState, baseUi]
+    (_, Just connPrompt) -> [renderConnectionPrompt connPrompt, baseUi]
+    _ -> [baseUi]
   where
     baseUi = vBox [header, mainContent, inputBox]
-    header = drawHeader (character ts) (viewportFocus ts)
+    header = drawHeader (character ts) (viewportFocus ts) (multiplayerStatus ts) (connectedPlayers ts)
     mainContent = hBox [leftPanel, logPanel, systemPanel]
     leftPanel = vBox [charSheet, cardsSheet]
     cardsSheet = hLimit charSheetWidth $ borderWithLabel (str " Cartas ") $ padAll 1 $ drawCards (character ts)
@@ -200,15 +214,41 @@ renderChoicePopup choiceState =
     errorWidgets =
       maybe [] (\err -> [str " ", withAttr choiceDisabledAttr (txtWrap err)]) (choiceStateError choiceState)
 
--- Draw header with scroll focus instruction
-drawHeader :: Maybe GameContext.MainCharacter -> F.FocusRing Name -> Widget Name
-drawHeader _ focusRing =
+-- Draw header with scroll focus instruction and multiplayer status
+drawHeader :: Maybe GameContext.MainCharacter -> F.FocusRing Name -> Maybe (Bool, T.Text, T.Text) -> [T.Text] -> Widget Name
+drawHeader _ focusRing mpStatus players =
   let focusIndicator = case F.focusGetCurrent focusRing of
         Just LogViewport -> "Log"
         Just SystemViewport -> "Sistema"
         _ -> "Nenhum"
       instruction = "Aperte <Tab> para mudar o foco do scroll | Foco atual: " ++ focusIndicator
-   in hCenter $ str instruction
+      mpInfo = case mpStatus of
+        Just (True, ip, port) -> " | Host: " ++ T.unpack ip ++ ":" ++ T.unpack port
+        Just (False, host, port) -> " | Conectado: " ++ T.unpack host ++ ":" ++ T.unpack port
+        Nothing -> ""
+      playersInfo = if null players then "" else " | Jogadores: " ++ T.unpack (T.intercalate ", " players)
+   in hCenter $ str (instruction ++ mpInfo ++ playersInfo)
+
+-- Render connection approval prompt
+renderConnectionPrompt :: ConnectionPromptState -> Widget Name
+renderConnectionPrompt prompt =
+  centerLayer $
+    borderWithLabel (str " Solicitação de Conexão ") $
+      padAll 1 $
+        vBox
+          [ txtWrap $ T.concat ["Jogador ", connPromptPlayerName prompt, " (", connPromptCharacterName prompt, ") quer se conectar."],
+            str " ",
+            str "Aceitar conexão?",
+            str " ",
+            if connPromptSelected prompt == 0
+              then withAttr choiceSelectedAttr $ padLeft (Pad 2) $ str "> Sim"
+              else padLeft (Pad 2) $ str "  Sim",
+            if connPromptSelected prompt == 1
+              then withAttr choiceSelectedAttr $ padLeft (Pad 2) $ str "> Não"
+              else padLeft (Pad 2) $ str "  Não",
+            str " ",
+            str "Use ↑/↓ para navegar, Enter para confirmar, Esc para cancelar"
+          ]
 
 -- Draw system messages with word wrap and spacing
 drawSystemMessages :: Vec.Vector T.Text -> Widget Name
@@ -265,6 +305,25 @@ handleEvent :: BrickEvent Name GameOutput -> EventM Name TuiState ()
 handleEvent event = case event of
   AppEvent (ChoicePrompt payload) ->
     handleChoicePromptEvent payload
+  AppEvent (ConnectionRequestPrompt playerName charName) -> do
+    st <- get
+    let prompt = ConnectionPromptState
+          { connPromptPlayerName = playerName
+          , connPromptCharacterName = charName
+          , connPromptSelected = 0  -- Começa selecionando "Sim"
+          }
+    put st {activeConnectionPrompt = Just prompt}
+  AppEvent (HostInfo ip port) -> do
+    st <- get
+    put st {multiplayerStatus = Just (True, ip, port)}
+  AppEvent (ConnectionStatus msg connected) -> do
+    st <- get
+    let newSysMsgs = systemMessages st `Vec.snoc` msg
+    put st {systemMessages = newSysMsgs, multiplayerStatus = if connected then multiplayerStatus st else Nothing}
+    vScrollToEnd (viewportScroll SystemViewport)
+  AppEvent (PlayerList players) -> do
+    st <- get
+    put st {connectedPlayers = players}
   AppEvent (LogEntry msg msgType) -> do
     st <- get
     case msgType of
@@ -344,13 +403,15 @@ handleVtyEvent ev = do
   case ev of
     Vty.EvKey (Vty.KChar 'c') [Vty.MCtrl] -> halt
     Vty.EvKey Vty.KEsc [] ->
-      case activeChoice st of
-        Just _ -> cancelChoiceSelection
-        Nothing -> halt
+      case (activeChoice st, activeConnectionPrompt st) of
+        (Just _, _) -> cancelChoiceSelection
+        (_, Just _) -> cancelConnectionPrompt
+        _ -> halt
     _ ->
-      case activeChoice st of
-        Just _ -> handleChoicePopupKey ev
-        Nothing -> handleDefaultVtyEvent ev
+      case (activeChoice st, activeConnectionPrompt st) of
+        (Just _, _) -> handleChoicePopupKey ev
+        (_, Just _) -> handleConnectionPromptKey ev
+        _ -> handleDefaultVtyEvent ev
 
 handleChoicePopupKey :: Vty.Event -> EventM Name TuiState ()
 handleChoicePopupKey ev = do
@@ -373,6 +434,62 @@ handleChoicePopupKey ev = do
           | isDigit ch && ch /= '0' ->
               submitChoiceSelectionIndex (digitToInt ch - 1)
         _ -> return ()
+
+-- Handle keyboard events for connection prompt
+handleConnectionPromptKey :: Vty.Event -> EventM Name TuiState ()
+handleConnectionPromptKey ev = do
+  st <- get
+  case activeConnectionPrompt st of
+    Nothing -> return ()
+    Just prompt ->
+      case ev of
+        Vty.EvKey Vty.KEnter [] ->
+          submitConnectionResponse (connPromptSelected prompt == 0)
+        Vty.EvKey Vty.KUp [] ->
+          moveConnectionSelectionBy (-1)
+        Vty.EvKey Vty.KDown [] ->
+          moveConnectionSelectionBy 1
+        Vty.EvKey (Vty.KChar 's') [] ->
+          submitConnectionResponse True  -- 's' para Sim
+        Vty.EvKey (Vty.KChar 'n') [] ->
+          submitConnectionResponse False  -- 'n' para Não
+        _ -> return ()
+
+-- Move connection prompt selection
+moveConnectionSelectionBy :: Int -> EventM Name TuiState ()
+moveConnectionSelectionBy delta = do
+  st <- get
+  case activeConnectionPrompt st of
+    Nothing -> return ()
+    Just prompt -> do
+      let current = connPromptSelected prompt
+      let newSelection = max 0 (min 1 (current + delta))
+      put st {activeConnectionPrompt = Just prompt {connPromptSelected = newSelection}}
+
+-- Submit connection response (accept or reject)
+submitConnectionResponse :: Bool -> EventM Name TuiState ()
+submitConnectionResponse accept = do
+  st <- get
+  case activeConnectionPrompt st of
+    Nothing -> return ()
+    Just prompt -> do
+      -- Envia comando para aceitar ou recusar conexão
+      -- Por enquanto, vamos usar um comando especial que será processado pelo servidor
+      -- TODO: Implementar comando específico para aprovação de conexão
+      let command = if accept then ":accept" else ":reject"
+      liftIO $ atomically $ writeTChan (inputChan st) command
+      put st {activeConnectionPrompt = Nothing}
+
+-- Cancel connection prompt
+cancelConnectionPrompt :: EventM Name TuiState ()
+cancelConnectionPrompt = do
+  st <- get
+  case activeConnectionPrompt st of
+    Nothing -> return ()
+    Just _ -> do
+      -- Envia comando para recusar (cancelar = recusar)
+      liftIO $ atomically $ writeTChan (inputChan st) ":reject"
+      put st {activeConnectionPrompt = Nothing}
 
 handleDefaultVtyEvent :: Vty.Event -> EventM Name TuiState ()
 handleDefaultVtyEvent ev = case ev of

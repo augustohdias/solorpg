@@ -19,6 +19,9 @@ module System.Progress
   , completeTrack
   , clearTrack
   , executeProgressRoll
+  -- Exported for testing
+  , evaluateProgressRoll
+  , getRankExperienceValue
   ) where
 
 import qualified System.Dice as Dice

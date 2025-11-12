@@ -6,8 +6,10 @@ module System.Action
   )
 where
 
+import Control.Concurrent (forkIO)
+import Control.Concurrent.MVar (modifyMVar_)
 import Control.Concurrent.STM (TChan, atomically, writeTChan)
-import Control.Monad (unless, void)
+import Control.Monad (unless, void, when)
 import qualified Data.Aeson as Aeson
 import Data.Char (isAlphaNum)
 import Data.Foldable (forM_, for_)
@@ -15,7 +17,10 @@ import Data.Function ((&))
 import Data.Maybe (fromMaybe)
 import qualified Data.Text as T
 import qualified Data.Text.Encoding as TE
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Text.Read as TR
+import Data.Time.Clock (getCurrentTime)
+import Network.Socket (PortNumber)
 import System.ConsequenceContract (Choice (..), Consequence (..))
 import qualified System.ConsequenceContract as Consequence
 import qualified System.Constants as C
@@ -24,6 +29,11 @@ import System.GameContext (BondCommand (..))
 import qualified System.GameContext as GameContext
 import qualified System.Help as Help
 import qualified System.Move as Move
+import qualified System.Network.Client as NetworkClient
+import qualified System.Network.NetworkState as NetworkState
+import qualified System.Network.Protocol as NetworkProtocol
+import qualified System.Network.Server as NetworkServer
+import qualified System.Network.Types as NetworkTypes
 import qualified System.Oracle as Oracle
 import qualified System.Progress as Progress
 import System.Random (randomIO)
@@ -85,6 +95,18 @@ data ActionType
     AddBonusManually
   | -- | Resolve uma escolha pendente enviada pela TUI
     ResolveChoice
+  | -- | Inicia sessão multiplayer como host
+    HostSession
+  | -- | Conecta a uma sessão multiplayer
+    ConnectSession
+  | -- | Desconecta da sessão multiplayer
+    DisconnectSession
+  | -- | Cria um voto compartilhado
+    SharedVow
+  | -- | Aceita conexão pendente
+    AcceptConnection
+  | -- | Rejeita conexão pendente
+    RejectConnection
   | -- | Ação desconhecida
     Unknown
   deriving (Show, Eq)
@@ -116,6 +138,12 @@ process tuiOutputChannel actionType input = case actionType of
   Help -> helpCommand tuiOutputChannel input
   AddBonusManually -> addBonusCommand tuiOutputChannel input
   ResolveChoice -> resolveChoice tuiOutputChannel input
+  HostSession -> hostSession tuiOutputChannel input
+  ConnectSession -> connectSession tuiOutputChannel input
+  DisconnectSession -> disconnectSession tuiOutputChannel input
+  SharedVow -> sharedVow tuiOutputChannel input
+  AcceptConnection -> acceptConnection tuiOutputChannel input
+  RejectConnection -> rejectConnection tuiOutputChannel input
   _ -> defaultAction tuiOutputChannel input
 
 -- | Sends narrative messages to the TUI log channel.
@@ -160,14 +188,81 @@ addStoryLog tuiOutputChannel story
   where
     isCommand = T.isPrefixOf ":" story
     format ctx
-      | isFirstCharAlphaNum story = story
+      | not (isFirstCharAlphaNum story) = story
       | otherwise = GameContext.getCharacterName ctx <> ": " <> story
     execute = do
       whenContext $ \ctx -> do
-        ctxWithLog <- GameContext.addLogEntry ctx (format ctx)
+        let formattedLog = format ctx
+        ctxWithLog <- GameContext.addLogEntry ctx formattedLog
         void $ GameContext.saveContext ctxWithLog
-        logMessage tuiOutputChannel (format ctx)
+        logMessage tuiOutputChannel formattedLog
+
+        -- Se está em modo multiplayer e não é mensagem secreta (começa com ~)
+        if GameContext.isMultiplayer ctx && not (T.isPrefixOf "~" formattedLog)
+          then do
+            networkState <- NetworkState.getNetworkState
+            timestamp <- getCurrentTime
+            let playerName = GameContext.getCharacterName ctx
+
+            case networkState of
+              NetworkState.ServerState serverState -> do
+                -- Host faz broadcast para todos os clientes
+                let msg = NetworkProtocol.StoryLogEntry playerName formattedLog timestamp
+                NetworkServer.broadcastMessage serverState msg Nothing
+              NetworkState.ClientState clientState -> do
+                -- Cliente envia para o host
+                let msg = NetworkProtocol.StoryLogEntry playerName formattedLog timestamp
+                _ <- NetworkClient.sendMessage clientState msg
+                return ()
+              NetworkState.NoNetworkState -> return ()
+          else return ()
       return True
+
+-- | Sincroniza criação de shared vow
+syncSharedVowCreated :: TChan GameOutput -> GameContext.Context -> T.Text -> Progress.ProgressTrack -> IO ()
+syncSharedVowCreated tuiOutputChannel ctx vowName track = do
+  networkState <- NetworkState.getNetworkState
+  let playerName = GameContext.getCharacterName ctx
+  let trackData = TE.decodeUtf8 $ BL.toStrict (Aeson.encode track)
+  
+  case networkState of
+    NetworkState.ServerState serverState -> do
+      let msg = NetworkProtocol.SharedVowCreated playerName vowName trackData
+      NetworkServer.broadcastMessage serverState msg Nothing
+    NetworkState.ClientState clientState -> do
+      let msg = NetworkProtocol.SharedVowCreated playerName vowName trackData
+      void $ NetworkClient.sendMessage clientState msg
+    NetworkState.NoNetworkState -> return ()
+
+-- | Sincroniza progresso em shared vow
+syncSharedVowProgress :: TChan GameOutput -> GameContext.Context -> T.Text -> Int -> IO ()
+syncSharedVowProgress tuiOutputChannel ctx vowName ticks = do
+  networkState <- NetworkState.getNetworkState
+  let playerName = GameContext.getCharacterName ctx
+  
+  case networkState of
+    NetworkState.ServerState serverState -> do
+      let msg = NetworkProtocol.SharedVowProgress playerName vowName ticks
+      NetworkServer.broadcastMessage serverState msg Nothing
+    NetworkState.ClientState clientState -> do
+      let msg = NetworkProtocol.SharedVowProgress playerName vowName ticks
+      void $ NetworkClient.sendMessage clientState msg
+    NetworkState.NoNetworkState -> return ()
+
+-- | Sincroniza conclusão de shared vow
+syncSharedVowCompleted :: TChan GameOutput -> GameContext.Context -> T.Text -> Int -> IO ()
+syncSharedVowCompleted tuiOutputChannel ctx vowName experience = do
+  networkState <- NetworkState.getNetworkState
+  let playerName = GameContext.getCharacterName ctx
+  
+  case networkState of
+    NetworkState.ServerState serverState -> do
+      let msg = NetworkProtocol.SharedVowCompleted playerName vowName experience
+      NetworkServer.broadcastMessage serverState msg Nothing
+    NetworkState.ClientState clientState -> do
+      let msg = NetworkProtocol.SharedVowCompleted playerName vowName experience
+      void $ NetworkClient.sendMessage clientState msg
+    NetworkState.NoNetworkState -> return ()
 
 -- | Executes dice rolls using dice specification strings.
 rollDice :: TChan GameOutput -> T.Text -> IO Bool
@@ -597,6 +692,11 @@ createCombatTrack tuiOutputChannel input = withContext $ \ctx -> do
       _ <- GameContext.saveContext updatedCtx
       let formattedMsg = T.pack $ C.formatCombatTrackCreated C.moveMessages enemyName (T.unpack $ Parser.rankToText rank) ticks
       _ <- process tuiOutputChannel AddStoryLog formattedMsg
+      
+      -- Sincroniza track de combate em modo multiplayer
+      when (GameContext.isMultiplayer updatedCtx) $ do
+        syncProgressTrack tuiOutputChannel updatedCtx enemyName track
+      
       return True
 
 -- | Marks progress on an existing progress track.
@@ -628,6 +728,20 @@ markProgress tuiOutputChannel input = withContext $ \ctx -> do
                   <> T.pack (show ticks)
                   <> "/40 ticks)"
           _ <- process tuiOutputChannel AddStoryLog msg
+          
+          -- Sincroniza track em modo multiplayer
+          when (GameContext.isMultiplayer updatedCtx) $ do
+            case Progress.trackType track of
+              Progress.Combat -> syncProgressTrack tuiOutputChannel updatedCtx name updatedTrack
+              Progress.Journey -> syncProgressTrack tuiOutputChannel updatedCtx name updatedTrack
+              Progress.Vow -> do
+                -- Verifica se é shared vow (todos os vows em multiplayer são compartilhados)
+                let oldTicks = Progress.trackTicks track
+                let newTicks = Progress.trackTicks updatedTrack
+                when (newTicks > oldTicks) $ do
+                  syncSharedVowProgress tuiOutputChannel updatedCtx name (newTicks - oldTicks)
+              _ -> return ()
+          
           return True
 
     nonEmpty s = if T.null s then Nothing else Just s
@@ -653,6 +767,12 @@ rollProgress tuiOutputChannel input = withContext $ \ctx -> do
           finalCtx <- applyExperienceGain updatedCtx (Progress.executionExperienceGained executionResult)
           _ <- GameContext.saveContext finalCtx
           forM_ (Progress.executionSystemMessage executionResult) (systemMessage tuiOutputChannel)
+          
+          -- Sincroniza shared vow quando completado
+          when (GameContext.isMultiplayer finalCtx && Progress.trackType track == Progress.Vow && Progress.executionExperienceGained executionResult > 0) $ do
+            syncSharedVowCompleted tuiOutputChannel finalCtx name (Progress.executionExperienceGained executionResult)
+            -- Host também recebe experiência automaticamente (clientes recebem via broadcast)
+          
           return True
 
     applyExperienceGain ctx expGained
@@ -741,3 +861,220 @@ addBonusCommand tuiOutputChannel input = withContext $ \ctx -> do
           <> ") para "
           <> bonusTypeStr
       return True
+
+-- | Inicia uma sessão multiplayer como host
+hostSession :: TChan GameOutput -> T.Text -> IO Bool
+hostSession tuiOutputChannel _input = do
+  maybeCtx <- GameContext.getCurrentContext
+  case maybeCtx of
+    Nothing -> do
+      systemMessage tuiOutputChannel "Erro: Nenhum personagem carregado. Use :load para carregar um personagem."
+      return True
+    Just ctx -> do
+      let playerName = GameContext.getCharacterName ctx
+      let characterName = GameContext.name (GameContext.mainCharacter ctx)
+
+      -- Inicia servidor com canal TUI
+      result <- NetworkServer.startServer NetworkServer.defaultPort playerName characterName (Just tuiOutputChannel)
+      case result of
+        Left err -> do
+          systemMessage tuiOutputChannel $ "Erro ao iniciar servidor: " <> T.pack err
+          return True
+        Right serverState -> do
+          -- Salva estado de rede
+          NetworkState.setNetworkState (NetworkState.ServerState serverState)
+
+          -- Atualiza contexto para modo multiplayer
+          let updatedCtx =
+                ctx
+                  { GameContext.isMultiplayer = True,
+                    GameContext.multiplayerSessionId = Just (T.pack $ "session-" ++ show NetworkServer.defaultPort)
+                  }
+          void $ GameContext.saveContext updatedCtx
+          -- Atualiza o contexto no MVar também (saveContext só salva no arquivo)
+          cache <- GameContext.getContextCache
+          modifyMVar_ cache $ \_ -> return (Just updatedCtx)
+
+          -- Obtém IP local
+          maybeIP <- NetworkServer.getLocalIP
+          let ipStr = fromMaybe "localhost" maybeIP
+
+          -- Mostra informações na TUI
+          systemMessage tuiOutputChannel $ "Servidor iniciado na porta " <> T.pack (show NetworkServer.defaultPort)
+          systemMessage tuiOutputChannel $ "IP: " <> T.pack ipStr <> ":" <> T.pack (show NetworkServer.defaultPort)
+          systemMessage tuiOutputChannel "Aguardando conexões..."
+
+          return True
+
+-- | Conecta a uma sessão multiplayer
+connectSession :: TChan GameOutput -> T.Text -> IO Bool
+connectSession tuiOutputChannel input = do
+  maybeCtx <- GameContext.getCurrentContext
+  case maybeCtx of
+    Nothing -> do
+      systemMessage tuiOutputChannel "Erro: Nenhum personagem carregado. Use :load para carregar um personagem."
+      return True
+    Just ctx -> do
+      -- Parse do input (formato: "ip:port" ou "ip port")
+      let parts = T.splitOn ":" (T.strip input)
+      if length parts == 2
+        then do
+          let host = T.unpack (head parts)
+          let portStr = parts !! 1
+          case TR.decimal portStr of
+            Right (port, _) -> do
+              let playerName = GameContext.getCharacterName ctx
+              let characterName = GameContext.name (GameContext.mainCharacter ctx)
+
+              -- Conecta ao servidor
+              result <- NetworkClient.connectToServer host (fromIntegral port) playerName characterName
+              case result of
+                Left err -> do
+                  systemMessage tuiOutputChannel $ "Erro ao conectar: " <> T.pack err
+                  return True
+                Right clientState -> do
+                  -- Salva estado de rede
+                  NetworkState.setNetworkState (NetworkState.ClientState clientState)
+
+                  -- Atualiza contexto para modo multiplayer
+                  let updatedCtx =
+                        ctx
+                          { GameContext.isMultiplayer = True,
+                            GameContext.multiplayerSessionId = Just (T.pack $ host ++ ":" ++ show port)
+                          }
+                  
+                  -- CORRIGIDO: Atualiza o cache em memória primeiro, depois salva no arquivo
+                  cache <- GameContext.getContextCache
+                  modifyMVar_ cache $ \_ -> return (Just updatedCtx)
+                  void $ GameContext.saveContext updatedCtx
+
+                  -- Inicia loop de recepção
+                  NetworkClient.startReceiveLoop clientState tuiOutputChannel
+
+                  systemMessage tuiOutputChannel "Conectado ao servidor!"
+                  return True
+            Left _ -> do
+              systemMessage tuiOutputChannel "Formato inválido. Use: :connect <ip:port>"
+              return True
+        else do
+          systemMessage tuiOutputChannel "Formato inválido. Use: :connect <ip:port>"
+          return True
+
+-- | Desconecta da sessão multiplayer
+disconnectSession :: TChan GameOutput -> T.Text -> IO Bool
+disconnectSession tuiOutputChannel _input = do
+  networkState <- NetworkState.getNetworkState
+  case networkState of
+    NetworkState.ServerState serverState -> do
+      NetworkServer.stopServer serverState
+      NetworkState.clearNetworkState
+      maybeCtx <- GameContext.getCurrentContext
+      for_ maybeCtx $ \ctx -> do
+        let updatedCtx =
+              ctx
+                { GameContext.isMultiplayer = False,
+                  GameContext.multiplayerSessionId = Nothing
+                }
+        void $ GameContext.saveContext updatedCtx
+      systemMessage tuiOutputChannel "Servidor encerrado."
+    NetworkState.ClientState clientState -> do
+      NetworkClient.disconnectFromServer clientState
+      NetworkState.clearNetworkState
+      maybeCtx <- GameContext.getCurrentContext
+      for_ maybeCtx $ \ctx -> do
+        let updatedCtx =
+              ctx
+                { GameContext.isMultiplayer = False,
+                  GameContext.multiplayerSessionId = Nothing
+                }
+        void $ GameContext.saveContext updatedCtx
+      systemMessage tuiOutputChannel "Desconectado do servidor."
+    NetworkState.NoNetworkState -> do
+      systemMessage tuiOutputChannel "Não há sessão multiplayer ativa."
+  return True
+
+-- | Cria um voto compartilhado
+sharedVow :: TChan GameOutput -> T.Text -> IO Bool
+sharedVow tuiOutputChannel input = withContext $ \ctx -> do
+  -- Verifica se está em modo multiplayer
+  if not (GameContext.isMultiplayer ctx)
+    then do
+      systemMessage tuiOutputChannel "Shared vows só podem ser criados em modo multiplayer."
+      return True
+    else do
+      maybe handleParseError (processSharedVow ctx) (Parser.parseQuotedString input)
+  where
+    handleParseError = systemMessage tuiOutputChannel (T.pack (C.msgVowUsage C.moveMessages)) >> return True
+    processSharedVow ctx (vowName, rest) = maybe (handleInvalidRank rest) (createSharedVow ctx vowName) (Parser.parseRank (T.strip rest))
+    handleInvalidRank rest = do
+      systemMessage tuiOutputChannel $ T.pack (C.errInvalidRank C.errorMessages) <> T.strip rest
+      systemMessage tuiOutputChannel $ T.pack (C.msgVowUsage C.moveMessages)
+      return True
+    createSharedVow ctx vowName rank = do
+      let track = Progress.newProgressTrack vowName Progress.Vow rank
+      let ticks = Progress.getTicksForRank rank
+      updatedCtx <- GameContext.addProgressTrack ctx track
+      _ <- GameContext.saveContext updatedCtx
+      let formattedMsg = T.pack $ C.formatVowCreated C.moveMessages vowName (T.unpack $ Parser.rankToText rank) ticks
+      _ <- process tuiOutputChannel AddStoryLog formattedMsg
+      
+      -- Faz broadcast do shared vow
+      syncSharedVowCreated tuiOutputChannel updatedCtx vowName track
+      
+      return True
+
+-- | Aceita uma conexão pendente
+-- Se não fornecer nome, aceita a primeira conexão pendente
+acceptConnection :: TChan GameOutput -> T.Text -> IO Bool
+acceptConnection tuiOutputChannel input = do
+  networkState <- NetworkState.getNetworkState
+  case networkState of
+    NetworkState.ServerState serverState -> do
+      let playerName = T.strip input
+      maybeConn <- NetworkServer.approveConnection serverState playerName
+      case maybeConn of
+        Nothing -> do
+          if T.null playerName
+            then systemMessage tuiOutputChannel "Nenhuma conexão pendente para aceitar."
+            else systemMessage tuiOutputChannel $ "Nenhuma conexão pendente encontrada para " <> playerName
+        Just conn -> do
+          systemMessage tuiOutputChannel $ "Conexão aceita: " <> NetworkTypes.connPlayerName conn <> " (" <> NetworkTypes.connCharacterName conn <> ")"
+          -- receiveLoop já foi iniciado pelo approveConnection
+          -- Lista de jogadores será atualizada automaticamente pelo acceptConnection
+      return True
+    _ -> do
+      systemMessage tuiOutputChannel "Apenas o host pode aceitar conexões."
+      return True
+
+-- | Rejeita uma conexão pendente
+-- Se não fornecer nome, rejeita a primeira conexão pendente
+rejectConnection :: TChan GameOutput -> T.Text -> IO Bool
+rejectConnection tuiOutputChannel input = do
+  networkState <- NetworkState.getNetworkState
+  case networkState of
+    NetworkState.ServerState serverState -> do
+      let playerName = T.strip input
+      NetworkServer.rejectPendingConnection serverState playerName
+      systemMessage tuiOutputChannel $ "Conexão rejeitada: " <> (if T.null playerName then "primeira pendente" else playerName)
+      return True
+    _ -> do
+      systemMessage tuiOutputChannel "Apenas o host pode rejeitar conexões."
+      return True
+
+-- | Sincroniza um progress track em modo multiplayer
+syncProgressTrack :: TChan GameOutput -> GameContext.Context -> T.Text -> Progress.ProgressTrack -> IO ()
+syncProgressTrack tuiOutputChannel ctx trackName track = do
+  -- Apenas sincroniza Combat e Journey
+  when (Progress.trackType track == Progress.Combat || Progress.trackType track == Progress.Journey) $ do
+    networkState <- NetworkState.getNetworkState
+    let playerName = GameContext.getCharacterName ctx
+    let trackData = TE.decodeUtf8 $ BL.toStrict (Aeson.encode track)  -- Serializa track para JSON string
+    
+    case networkState of
+      NetworkState.ServerState serverState -> do
+        let msg = NetworkProtocol.ProgressTrackSync playerName trackName trackData
+        NetworkServer.broadcastMessage serverState msg Nothing
+      NetworkState.ClientState clientState -> do
+        let msg = NetworkProtocol.ProgressTrackSync playerName trackName trackData
+        void $ NetworkClient.sendMessage clientState msg
+      NetworkState.NoNetworkState -> return ()

@@ -26,6 +26,10 @@ data GameOutput
   | CharacterUpdate GameContext.MainCharacter
   | GameEnd
   | ChoicePrompt ChoicePromptPayload
+  | ConnectionStatus T.Text Bool  -- ^ Status da conex?o (mensagem, conectado?)
+  | HostInfo T.Text T.Text        -- ^ IP e porta do host
+  | ConnectionRequestPrompt T.Text T.Text  -- ^ Solicita??o de conex?o (playerName, characterName)
+  | PlayerList [T.Text]            -- ^ Lista de jogadores conectados
 
 -- | Payload sent to TUI to request player input for branching consequences.
 data ChoicePromptPayload = ChoicePromptPayload

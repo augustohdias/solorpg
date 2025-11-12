@@ -6,6 +6,12 @@ module System.Dice
     , roll
     , challengeRoll
     , formatChallengeResult
+    -- Exported for testing
+    , evaluateActionRoll
+    , parseDiceString
+    , parseSingleDice
+    , parseDiceType
+    , rollDice
     ) where
 
 import qualified Data.Text as T

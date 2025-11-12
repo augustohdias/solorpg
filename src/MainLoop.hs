@@ -1,6 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module MainLoop (runGameLoop) where
+module MainLoop 
+  ( runGameLoop
+  -- Exported for testing
+  , parseCommand
+  , parseActionType
+  ) where
 
 import Control.Concurrent.STM (TChan, readTChan)
 import Control.Monad.STM (atomically)
@@ -60,4 +65,10 @@ parseActionType cmd = case cmd of
   ":bond" -> Action.Bond
   ":bonus" -> Action.AddBonusManually
   ":choice" -> Action.ResolveChoice
+  ":host" -> Action.HostSession
+  ":connect" -> Action.ConnectSession
+  ":disconnect" -> Action.DisconnectSession
+  ":sharedvow" -> Action.SharedVow
+  ":accept" -> Action.AcceptConnection
+  ":reject" -> Action.RejectConnection
   _ -> Action.Unknown

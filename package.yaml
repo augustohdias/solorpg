@@ -39,6 +39,7 @@ dependencies:
 - microlens-mtl
 - async
 - ansi-terminal
+- network
 
 ghc-options:
 - -Wall
@@ -75,3 +76,6 @@ tests:
     - -with-rtsopts=-N
     dependencies:
     - SoloRPG
+    - hspec
+    - QuickCheck
+    - hspec-discover
