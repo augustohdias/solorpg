@@ -17,7 +17,7 @@ main = do
   outputChan <- newTChanIO :: IO (TChan GameOutput)
 
   
-  Oracle.initializeOracles "oracles"
+  Oracle.initializeOracles ""
   _ <- AssetLoader.loadAllAssets
 
   

@@ -37,6 +37,7 @@ import System.IO.Unsafe (unsafePerformIO)
 import Data.Maybe (catMaybes)
 import Data.List (find)
 import qualified Data.ByteString.Lazy as BL
+import Paths_SoloRPG (getDataDir)
 
 
 data AssetSkillJSON = AssetSkillJSON
@@ -114,7 +115,8 @@ loadAssetFromFile filePath = do
 
 loadAllAssets :: IO [GameContext.Asset]
 loadAllAssets = do
-  let assetsDir = "assets"
+  dataDir <- getDataDir
+  let assetsDir = dataDir </> "assets"
   exists <- doesDirectoryExist assetsDir
   if not exists
     then return []

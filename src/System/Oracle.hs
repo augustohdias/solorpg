@@ -29,6 +29,7 @@ import System.FilePath ((</>), takeExtension)
 import Control.Monad (when, unless)
 import GHC.Generics (Generic)
 import System.IO.Unsafe (unsafePerformIO)
+import Paths_SoloRPG (getDataDir)
 
 
 data OracleEntry = OracleEntry
@@ -85,7 +86,9 @@ getCache = do
 
 
 initializeOracles :: FilePath -> IO ()
-initializeOracles oraclesDir = do
+initializeOracles _ = do
+  dataDir <- getDataDir
+  let oraclesDir = dataDir </> "oracles"
   dirExists <- doesDirectoryExist oraclesDir
   when dirExists $ do
     (try (listDirectory oraclesDir) :: IO (Either IOException [FilePath])) >>= either

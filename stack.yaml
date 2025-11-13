@@ -39,7 +39,11 @@ packages:
 # - git: https://github.com/commercialhaskell/stack.git
 #   commit: e7b331f14bcffb8367cd58fbfc8b40ec7642100a
 #
-# extra-deps: []
+extra-deps:
+- vty-windows-0.2.0.4@sha256:6e338f56b8a1cac34ec53433bdbfc6d104cbf90ae296ad42830d7f3cea83ecca,2753
+- Win32-2.14.2.1@sha256:7c68fc9d937c6e4c590472e9dd06d7e336338e01a5f2918ee9cf75c28871badd,5875
+- directory-1.3.9.0@sha256:ed6784601c6a800d4c1e40efbc9f20cf33ae2f25cac301fc239f9c91947b816b,3307
+- time-1.14@sha256:918455e07f347049c2169a43169aca77de7a2c97e33aca0b476aabcd8a79798d,6989
 
 # Override default flag values for project packages and extra-deps
 # flags: {}
